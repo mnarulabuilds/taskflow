@@ -5,7 +5,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(
     workspaceId: string,
@@ -32,10 +32,26 @@ export class ProjectsService {
     await this.assertMembership(workspaceId, currentUserId);
 
     return this.prisma.project.findMany({
-      where: { workspaceId },
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        createdBy: { select: { id: true, name: true, email: true } },
+      where: {
+        workspaceId,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        workspaceId: true,
+        createdById: true,
+        createdAt: true,
+        updatedAt: true,
+
+        _count: {
+          select: {
+            tasks: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
   }

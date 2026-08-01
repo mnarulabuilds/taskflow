@@ -10,7 +10,7 @@ import { WorkspaceMember, WorkspaceRole } from '@prisma/client';
 
 @Injectable()
 export class WorkspacesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   create(ownerId: string, name: string) {
     return this.prisma.$transaction(async (tx) => {
@@ -34,21 +34,29 @@ export class WorkspacesService {
   }
 
   findAllForUser(userId: string) {
-    return this.prisma.workspaceMember.findMany({
-      where: { userId },
-      select: {
-        role: true,
-        workspace: {
-          select: {
-            id: true,
-            name: true,
-            createdAt: true,
-            updatedAt: true,
-            _count: { select: { projects: true, members: true } },
+    return this.prisma.workspace.findMany({
+      where: {
+        members: {
+          some: {
+            userId,
           },
         },
       },
-      orderBy: { workspace: { updatedAt: 'desc' } },
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+        createdAt: true,
+        _count: {
+          select: {
+            projects: true,
+            members: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
   }
 

@@ -11,7 +11,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: allowedOrigins,
-    methods: ['GET', 'HEAD', 'POST', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'POST', 'OPTIONS', 'PATCH'],
   });
 
   app.useGlobalPipes(
