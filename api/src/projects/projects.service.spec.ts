@@ -1,7 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ProjectsService } from './projects.service';
-import { PrismaService } from '../prisma/prisma.service';
 import { ForbiddenException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+
+import { PrismaService } from '../prisma/prisma.service';
+import { ProjectsService } from './projects.service';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
@@ -11,22 +12,51 @@ describe('ProjectsService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectsService,
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
-
     service = module.get<ProjectsService>(ProjectsService);
   });
 
-  it('rejects listing projects for a user outside the workspace', async () => {
-    prisma.workspaceMember.findUnique.mockResolvedValue(null);
+  it('creates a project for a workspace member', async () => {
+    prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
+    prisma.project.create.mockResolvedValue({ id: 'project-1' });
+    const dto = { name: 'Launch', description: 'Ship it' };
 
-    await expect(
-      service.findAll('workspace-1', 'user-1'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(prisma.project.findMany).not.toHaveBeenCalled();
+    await expect(service.create('workspace-1', 'user-1', dto)).resolves.toEqual(
+      { id: 'project-1' },
+    );
+    expect(prisma.project.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { ...dto, workspaceId: 'workspace-1', createdById: 'user-1' },
+      }),
+    );
   });
+
+  it('lists projects for a workspace member', async () => {
+    prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
+    prisma.project.findMany.mockResolvedValue([]);
+    await expect(service.findAll('workspace-1', 'user-1')).resolves.toEqual([]);
+    expect(prisma.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { workspaceId: 'workspace-1' } }),
+    );
+  });
+
+  it.each(['create', 'findAll'] as const)(
+    'rejects %s for a user outside the workspace',
+    async (operation) => {
+      prisma.workspaceMember.findUnique.mockResolvedValue(null);
+      const result =
+        operation === 'create'
+          ? service.create('workspace-1', 'user-1', { name: 'Launch' })
+          : service.findAll('workspace-1', 'user-1');
+      await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.project.create).not.toHaveBeenCalled();
+      expect(prisma.project.findMany).not.toHaveBeenCalled();
+    },
+  );
 });
