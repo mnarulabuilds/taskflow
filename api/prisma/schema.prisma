@@ -7,11 +7,69 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String @id @default(cuid())
+  email       String @unique
+  name        String
+  password    String
+
+  workspaces  Workspace[]        @relation("OwnedWorkspaces")
+  memberships WorkspaceMember[]
+  projects    Project[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Workspace {
+  id          String @id @default(cuid())
+
+  name        String
+
+  ownerId     String
+  owner       User @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
+
+  members     WorkspaceMember[]
+  projects    Project[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WorkspaceMember {
+  id          String @id @default(cuid())
+
+  workspaceId String
+  userId      String
+
+  role        WorkspaceRole
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  user        User @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, userId])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+
+  name        String
+  description String?
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdById String
+  createdBy   User @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
