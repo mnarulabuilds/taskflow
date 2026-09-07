@@ -8,6 +8,8 @@ import {
   useState,
 } from 'react';
 
+import { cn } from '@/lib/cn';
+
 type ToastType = 'success' | 'error';
 
 interface Toast {
@@ -36,15 +38,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+      <div
+        className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2"
+        aria-live="polite"
+        aria-relevant="additions"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`rounded-lg px-4 py-3 text-sm text-white shadow-lg ${
-              toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
-            }`}
+            role="status"
+            className={cn(
+              'flex items-start gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg',
+              toast.type === 'success' ? 'bg-success' : 'bg-destructive',
+            )}
           >
-            {toast.message}
+            <span aria-hidden="true">{toast.type === 'success' ? '✓' : '!'}</span>
+            <span>{toast.message}</span>
           </div>
         ))}
       </div>

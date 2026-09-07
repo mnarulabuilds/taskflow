@@ -7,10 +7,13 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy/jwt.strategy';
 import { UsersModule } from '../users/users.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { RefreshTokenService } from './refresh-token.service';
 
 @Module({
   imports: [
     UsersModule,
+    PrismaModule,
     PassportModule.register({
       defaultStrategy: 'jwt',
     }),
@@ -27,6 +30,6 @@ import { UsersModule } from '../users/users.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, RefreshTokenService],
 })
 export class AuthModule {}

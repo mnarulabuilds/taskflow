@@ -85,11 +85,28 @@ export class TasksService {
         : {}),
     };
 
-    return this.prisma.task.findMany({
-      where,
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      include: this.taskDetails,
-    });
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+        include: this.taskDetails,
+        skip,
+        take: limit,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
   }
 
   async update(

@@ -1,14 +1,22 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import { FormEvent, useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { AuthLayout } from '@/components/auth-layout';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { AuthResponse } from '@/types/user';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const nameId = useId();
+  const emailId = useId();
+  const passwordId = useId();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -52,55 +60,68 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Create your TaskFlow account</h1>
+    <AuthLayout
+      title="Create your account"
+      subtitle="Start organizing work in minutes"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div>
+          <Label htmlFor={nameId}>Full name</Label>
+          <Input
+            id={nameId}
+            type="text"
+            autoComplete="name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+          />
+        </div>
 
-        <input
-          type="text"
-          placeholder="Name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className="w-full rounded border p-3"
-          required
-        />
+        <div>
+          <Label htmlFor={emailId}>Email address</Label>
+          <Input
+            id={emailId}
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+        </div>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="w-full rounded border p-3"
-          required
-        />
+        <div>
+          <Label htmlFor={passwordId}>Password</Label>
+          <Input
+            id={passwordId}
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            minLength={8}
+            required
+            aria-describedby={`${passwordId}-hint`}
+          />
+          <p id={`${passwordId}-hint`} className="mt-1 text-xs text-muted">
+            Must be at least 8 characters
+          </p>
+        </div>
 
-        <input
-          type="password"
-          placeholder="Password (min 8 characters)"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="w-full rounded border p-3"
-          minLength={8}
-          required
-        />
+        {error && <Alert variant="error">{error}</Alert>}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-black p-3 text-white disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading} className="w-full" size="lg">
           {loading ? 'Creating account...' : 'Create account'}
-        </button>
+        </Button>
 
-        <p className="text-center text-sm text-gray-600">
+        <p className="text-center text-sm text-muted">
           Already have an account?{' '}
-          <Link href="/login" className="font-medium text-black">
+          <Link
+            href="/login"
+            className="font-semibold text-primary hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             Sign in
           </Link>
         </p>
       </form>
-    </main>
+    </AuthLayout>
   );
 }

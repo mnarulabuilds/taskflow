@@ -3,6 +3,8 @@
 import { api } from '@/lib/api';
 import { WorkspaceInvite } from '@/types/notification';
 import { useToast } from '@/components/toast-provider';
+import { Button } from '@/components/ui/button';
+import { CardTitle } from '@/components/ui/card';
 
 interface PendingInvitesProps {
   invites: WorkspaceInvite[];
@@ -29,26 +31,28 @@ export function PendingInvites({ invites, onAccepted }: PendingInvitesProps) {
   }
 
   return (
-    <section className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-4">
-      <h2 className="font-semibold text-blue-900">Pending invitations</h2>
+    <section
+      aria-labelledby="pending-invites-title"
+      className="mb-8 rounded-xl border-2 border-info/30 bg-info/10 p-4"
+    >
+      <CardTitle id="pending-invites-title" className="text-info">
+        Pending invitations
+      </CardTitle>
       <ul className="mt-3 space-y-2">
         {invites.map((invite) => (
           <li
             key={invite.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded bg-white p-3"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3 shadow-sm"
           >
             <div>
-              <p className="font-medium">{invite.workspace.name}</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-semibold text-foreground">{invite.workspace.name}</p>
+              <p className="text-sm text-muted">
                 Invited by {invite.invitedBy.name} as {invite.role}
               </p>
             </div>
-            <button
-              onClick={() => acceptInvite(invite.token)}
-              className="rounded bg-black px-3 py-1.5 text-sm text-white"
-            >
+            <Button size="sm" onClick={() => acceptInvite(invite.token)}>
               Accept
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

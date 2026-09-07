@@ -1,11 +1,39 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import { Notification } from '@/types/notification';
 
+function notificationHref(notification: Notification) {
+  const metadata = notification.metadata ?? {};
+
+  if (typeof metadata.projectId === 'string') {
+    const taskId =
+      typeof metadata.taskId === 'string' ? metadata.taskId : undefined;
+    return taskId
+      ? `/projects/${metadata.projectId}?task=${taskId}`
+      : `/projects/${metadata.projectId}`;
+  }
+
+  if (typeof metadata.workspaceId === 'string') {
+    return `/workspaces/${metadata.workspaceId}`;
+  }
+
+  if (notification.type === 'WORKSPACE_INVITE') {
+    return '/dashboard';
+  }
+
+  return null;
+}
+
 export function NotificationBell() {
+  const router = useRouter();
+  const menuId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -27,9 +55,43 @@ export function NotificationBell() {
     return () => clearInterval(interval);
   }, [loadNotifications]);
 
-  async function markRead(notificationId: string) {
-    await api(`/notifications/${notificationId}/read`, { method: 'PATCH' });
-    await loadNotifications();
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  async function handleClick(notification: Notification) {
+    if (!notification.read) {
+      await api(`/notifications/${notification.id}/read`, { method: 'PATCH' });
+      await loadNotifications();
+    }
+
+    const href = notificationHref(notification);
+    if (href) {
+      setOpen(false);
+      router.push(href);
+    }
   }
 
   async function markAllRead() {
@@ -38,55 +100,64 @@ export function NotificationBell() {
   }
 
   return (
-    <div className="relative">
-      <button
+    <div ref={containerRef} className="relative">
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={() => setOpen((value) => !value)}
-        className="relative rounded border px-3 py-1.5 text-sm"
-        aria-label="Notifications"
+        aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-controls={menuId}
       >
-        Notifications
+        <span aria-hidden="true">🔔</span>
+        <span className="hidden sm:inline">Notifications</span>
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs text-white">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground">
             {unreadCount}
           </span>
         )}
-      </button>
+      </Button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-80 rounded-lg border bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <h3 className="font-medium">Notifications</h3>
+        <div
+          id={menuId}
+          role="menu"
+          aria-label="Notifications menu"
+          className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-surface shadow-xl"
+        >
+          <div className="flex items-center justify-between border-b border-border bg-surface-muted/60 px-4 py-3">
+            <h3 className="font-semibold text-foreground">Notifications</h3>
             {unreadCount > 0 && (
-              <button
-                onClick={markAllRead}
-                className="text-xs text-gray-500 hover:text-gray-800"
-              >
+              <Button variant="ghost" size="sm" onClick={markAllRead}>
                 Mark all read
-              </button>
+              </Button>
             )}
           </div>
 
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 && (
-              <p className="p-4 text-sm text-gray-500">No notifications yet.</p>
+              <p className="p-4 text-sm text-muted">No notifications yet.</p>
             )}
 
             {notifications.map((notification) => (
               <button
                 key={notification.id}
-                onClick={() => {
-                  if (!notification.read) {
-                    markRead(notification.id).catch(() => undefined);
-                  }
-                }}
-                className={`block w-full border-b px-4 py-3 text-left last:border-b-0 ${
-                  notification.read ? 'bg-white' : 'bg-blue-50'
-                }`}
+                role="menuitem"
+                onClick={() => handleClick(notification).catch(() => undefined)}
+                className={cn(
+                  'block w-full border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-surface-muted',
+                  notification.read ? 'bg-surface' : 'bg-info/10',
+                )}
               >
-                <p className="text-sm font-medium">{notification.title}</p>
-                <p className="mt-1 text-sm text-gray-600">{notification.message}</p>
-                <p className="mt-2 text-xs text-gray-400">
-                  {new Date(notification.createdAt).toLocaleString()}
+                <p className="text-sm font-medium text-foreground">
+                  {notification.title}
+                </p>
+                <p className="mt-1 text-sm text-muted">{notification.message}</p>
+                <p className="mt-2 text-xs text-muted">
+                  <time dateTime={notification.createdAt}>
+                    {new Date(notification.createdAt).toLocaleString()}
+                  </time>
                 </p>
               </button>
             ))}

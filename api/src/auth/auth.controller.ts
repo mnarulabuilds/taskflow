@@ -5,6 +5,7 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -15,9 +16,11 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtGuard } from './jwt/jwt.guard';
 import {
-  clearAuthCookie,
+  clearAuthCookies,
   parseExpiresIn,
-  setAuthCookie,
+  REFRESH_COOKIE,
+  setAccessCookie,
+  setRefreshCookie,
 } from './auth-cookie.util';
 
 @Controller('auth')
@@ -34,17 +37,39 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.login(loginDto);
-    const expiresIn = this.config.get<string>('JWT_EXPIRES_IN', '15m');
+    this.setTokenCookies(res, result.accessToken, result.refreshToken);
 
-    setAuthCookie(res, result.accessToken, parseExpiresIn(expiresIn));
+    return { user: result.user };
+  }
+
+  @Post('refresh')
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = request.cookies?.[REFRESH_COOKIE];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token missing');
+    }
+
+    const result = await this.authService.refresh(refreshToken);
+    this.setTokenCookies(res, result.accessToken, result.refreshToken);
 
     return { user: result.user };
   }
 
   @UseGuards(JwtGuard)
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
-    clearAuthCookie(res);
+  async logout(
+    @Req() request: Request & { user?: { id: string } },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.authService.logout(
+      request.cookies?.[REFRESH_COOKIE],
+      request.user?.id,
+    );
+    clearAuthCookies(res);
     return { success: true };
   }
 
@@ -52,5 +77,20 @@ export class AuthController {
   @Get('me')
   me(@Req() request: Request & { user: { id: string; email: string } }) {
     return request.user;
+  }
+
+  private setTokenCookies(
+    res: Response,
+    accessToken: string,
+    refreshToken: string,
+  ) {
+    const accessExpiresIn = this.config.get<string>('JWT_EXPIRES_IN', '15m');
+    const refreshExpiresIn = this.config.get<string>(
+      'JWT_REFRESH_EXPIRES_IN',
+      '7d',
+    );
+
+    setAccessCookie(res, accessToken, parseExpiresIn(accessExpiresIn));
+    setRefreshCookie(res, refreshToken, parseExpiresIn(refreshExpiresIn));
   }
 }

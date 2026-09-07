@@ -1,22 +1,41 @@
 import { Response } from 'express';
 
-const COOKIE_NAME = 'accessToken';
+export const ACCESS_COOKIE = 'accessToken';
+export const REFRESH_COOKIE = 'refreshToken';
 
-export function setAuthCookie(res: Response, token: string, maxAgeMs: number) {
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: maxAgeMs,
-  });
+export function setAccessCookie(
+  res: Response,
+  token: string,
+  maxAgeMs: number,
+) {
+  res.cookie(ACCESS_COOKIE, token, cookieOptions(maxAgeMs));
 }
 
-export function clearAuthCookie(res: Response) {
-  res.clearCookie(COOKIE_NAME, {
+export function setRefreshCookie(
+  res: Response,
+  token: string,
+  maxAgeMs: number,
+) {
+  res.cookie(REFRESH_COOKIE, token, cookieOptions(maxAgeMs));
+}
+
+export function clearAuthCookies(res: Response) {
+  const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
+    sameSite: 'lax' as const,
+  };
+  res.clearCookie(ACCESS_COOKIE, options);
+  res.clearCookie(REFRESH_COOKIE, options);
+}
+
+function cookieOptions(maxAgeMs: number) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: maxAgeMs,
+  };
 }
 
 export function parseExpiresIn(expiresIn: string): number {

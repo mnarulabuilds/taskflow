@@ -1,26 +1,119 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --background: #f5f3ff;
+  --foreground: #1e1b4b;
+  --surface: #ffffff;
+  --surface-muted: #ede9fe;
+  --border: #c4b5fd;
+
+  /* Brand */
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-foreground: #ffffff;
+  --accent: #0d9488;
+  --accent-foreground: #ffffff;
+
+  /* Semantic */
+  --muted: #64748b;
+  --muted-foreground: #475569;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #059669;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #78350f;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+
+  /* Focus & shape */
+  --ring: #6366f1;
+  --radius: 0.625rem;
+
+  /* Kanban columns */
+  --column-todo: #e0e7ff;
+  --column-todo-accent: #6366f1;
+  --column-progress: #fef3c7;
+  --column-progress-accent: #f59e0b;
+  --column-done: #d1fae5;
+  --column-done-accent: #059669;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-ring: var(--ring);
+  --color-column-todo: var(--column-todo);
+  --color-column-todo-accent: var(--column-todo-accent);
+  --color-column-progress: var(--column-progress);
+  --color-column-progress-accent: var(--column-progress-accent);
+  --color-column-done: var(--column-done);
+  --color-column-done-accent: var(--column-done-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-lg: var(--radius);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f0a1e;
+    --foreground: #ede9fe;
+    --surface: #1a1333;
+    --surface-muted: #2e1065;
+    --border: #5b21b6;
+    --primary: #818cf8;
+    --primary-hover: #a5b4fc;
+    --primary-foreground: #1e1b4b;
+    --muted: #a78bfa;
+    --muted-foreground: #c4b5fd;
+    --ring: #a5b4fc;
+    --column-todo: #1e1b4b;
+    --column-progress: #451a03;
+    --column-done: #064e3b;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }

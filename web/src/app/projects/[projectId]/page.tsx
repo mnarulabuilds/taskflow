@@ -1,7 +1,8 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { use, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
   DragEndEvent,
@@ -16,18 +17,27 @@ import { ActivityFeed } from '@/components/activity-feed';
 import { AppShell } from '@/components/app-shell';
 import { CreateTaskModal } from '@/components/create-task-modal';
 import { EditProjectModal } from '@/components/edit-project-modal';
+import { LoadingScreen } from '@/components/loading-screen';
 import { TaskDetailModal } from '@/components/task-detail-modal';
 import {
-  buildTaskQuery,
   TaskFilters,
   TaskFiltersState,
 } from '@/components/task-filters';
 import { useToast } from '@/components/toast-provider';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useProject, useTasks } from '@/hooks/use-queries';
 import { api } from '@/lib/api';
-import { Activity } from '@/types/activity';
-import { ProjectDetail } from '@/types/project';
-import { WorkspaceMember } from '@/types/member';
-import { Task, TaskStatus } from '@/types/task';
+import {
+  columnAccentClass,
+  columnClass,
+  dueDateBadgeClass,
+  dueDateLabel,
+  PRIORITY_LABELS,
+} from '@/lib/task-styles';
+import { formatDueDate } from '@/lib/workspace-utils';
+import { cn } from '@/lib/cn';
+import { Task, TaskPriority, TaskStatus } from '@/types/task';
 
 interface ProjectPageProps {
   params: Promise<{ projectId: string }>;
@@ -40,84 +50,62 @@ const EMPTY_FILTERS: TaskFiltersState = {
   assigneeId: '',
 };
 
+const COLUMN_TITLES: Record<TaskStatus, string> = {
+  TODO: 'To do',
+  IN_PROGRESS: 'In progress',
+  DONE: 'Done',
+};
+
 export default function ProjectPage({ params }: ProjectPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { projectId } = use(params);
   const { showToast } = useToast();
 
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
   const [filters, setFilters] = useState<TaskFiltersState>(EMPTY_FILTERS);
+  const [debouncedFilters, setDebouncedFilters] =
+    useState<TaskFiltersState>(EMPTY_FILTERS);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [createTaskStatus, setCreateTaskStatus] = useState<TaskStatus | null>(
     null,
   );
   const [showEditModal, setShowEditModal] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+
+  const projectQuery = useProject(projectId);
+  const tasksQuery = useTasks(projectId, debouncedFilters, page);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  const loadProjectMeta = useCallback(async () => {
-    const projectData = await api<ProjectDetail>(`/projects/${projectId}`);
-    const memberData = await api<WorkspaceMember[]>(
-      `/workspaces/${projectData.workspaceId}/members`,
-    );
-    const activityData = await api<Activity[]>(
-      `/projects/${projectId}/activity`,
-    );
-
-    setProject(projectData);
-    setMembers(memberData);
-    setActivities(activityData);
-    return projectData;
-  }, [projectId]);
-
-  const loadTasks = useCallback(
-    async (nextFilters: TaskFiltersState) => {
-      const query = buildTaskQuery(nextFilters);
-      const taskData = await api<Task[]>(
-        `/projects/${projectId}/tasks${query}`,
-      );
-      setTasks(taskData);
-    },
-    [projectId],
-  );
-
   useEffect(() => {
-    loadProjectMeta()
-      .then(() => loadTasks(EMPTY_FILTERS))
-      .catch((loadError) => {
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Unable to load project',
-        );
-      })
-      .finally(() => setLoading(false));
-  }, [loadProjectMeta, loadTasks]);
-
-  useEffect(() => {
-    if (loading) {
-      return;
-    }
-
     const timeout = setTimeout(() => {
-      loadTasks(filters).catch((loadError) => {
-        showToast(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Unable to filter tasks',
-        );
-      });
+      setDebouncedFilters(filters);
+      setPage(1);
     }, 300);
-
     return () => clearTimeout(timeout);
-  }, [filters, loading, loadTasks, showToast]);
+  }, [filters]);
+
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    const tasks = tasksQuery.data?.items ?? [];
+
+    if (taskId && tasks.length > 0) {
+      const task = tasks.find((item) => item.id === taskId);
+      if (task) {
+        setSelectedTask(task);
+      }
+    }
+  }, [searchParams, tasksQuery.data?.items]);
+
+  async function refreshProject() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }),
+    ]);
+  }
 
   async function createTask(title: string) {
     if (!createTaskStatus) {
@@ -133,26 +121,18 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       }),
     });
 
-    await Promise.all([loadTasks(filters), loadProjectMeta()]);
+    await refreshProject();
     showToast('Task created', 'success');
   }
 
   async function updateTaskStatus(taskId: string, status: TaskStatus) {
-    const previousTasks = tasks;
-    setTasks((current) =>
-      current.map((task) =>
-        task.id === taskId ? { ...task, status } : task,
-      ),
-    );
-
     try {
       await api(`/projects/${projectId}/tasks/${taskId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
-      await loadProjectMeta();
+      await refreshProject();
     } catch (updateError) {
-      setTasks(previousTasks);
       showToast(
         updateError instanceof Error
           ? updateError.message
@@ -169,7 +149,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
 
     const taskId = String(active.id);
     const newStatus = String(over.id) as TaskStatus;
-    const task = tasks.find((current) => current.id === taskId);
+    const task = tasksQuery.data?.items.find((item) => item.id === taskId);
 
     if (!task || task.status === newStatus) {
       return;
@@ -182,11 +162,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     name: string;
     description?: string | null;
   }) {
-    const updated = await api<ProjectDetail>(`/projects/${projectId}`, {
+    await api(`/projects/${projectId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
-    setProject(updated);
+    await refreshProject();
     showToast('Project updated', 'success');
   }
 
@@ -194,31 +174,23 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     await api(`/projects/${projectId}`, { method: 'DELETE' });
     showToast('Project deleted', 'success');
     router.push(
-      project ? `/workspaces/${project.workspaceId}` : '/dashboard',
+      projectQuery.data?.project
+        ? `/workspaces/${projectQuery.data.project.workspaceId}`
+        : '/dashboard',
     );
   }
 
-  function handleTaskUpdated(updatedTask: Task) {
-    setTasks((current) =>
-      current.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
-    );
+  if (projectQuery.isLoading || tasksQuery.isLoading) {
+    return <LoadingScreen message="Loading project..." />;
   }
 
-  function handleTaskDeleted(taskId: string) {
-    setTasks((current) => current.filter((task) => task.id !== taskId));
-  }
+  const project = projectQuery.data?.project;
+  const tasks = tasksQuery.data?.items ?? [];
+  const pagination = tasksQuery.data;
 
   const todoTasks = tasks.filter((task) => task.status === 'TODO');
   const inProgressTasks = tasks.filter((task) => task.status === 'IN_PROGRESS');
   const doneTasks = tasks.filter((task) => task.status === 'DONE');
-
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center p-8">
-        Loading project...
-      </main>
-    );
-  }
 
   return (
     <AppShell
@@ -233,28 +205,22 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{project?.name}</h1>
+          <h1 className="text-3xl font-bold text-foreground">{project?.name}</h1>
           {project?.description && (
-            <p className="mt-1 text-gray-600">{project.description}</p>
+            <p className="mt-1 text-muted">{project.description}</p>
           )}
-          <p className="mt-1 text-sm text-gray-500">
-            Drag tasks between columns or click to edit.
-          </p>
         </div>
-        <button
-          onClick={() => setShowEditModal(true)}
-          className="rounded border px-4 py-2 text-sm"
-        >
+        <Button variant="secondary" onClick={() => setShowEditModal(true)}>
           Project settings
-        </button>
+        </Button>
       </div>
 
-      {error && (
-        <div className="mt-6 rounded border p-4 text-red-600">{error}</div>
-      )}
-
       <div className="mt-6">
-        <TaskFilters filters={filters} members={members} onChange={setFilters} />
+        <TaskFilters
+          filters={filters}
+          members={projectQuery.data?.members ?? []}
+          onChange={setFilters}
+        />
       </div>
 
       <div className="mt-8 grid gap-8 xl:grid-cols-4">
@@ -262,21 +228,21 @@ export default function ProjectPage({ params }: ProjectPageProps) {
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div className="grid gap-6 lg:grid-cols-3">
               <TaskColumn
-                title="Todo"
+                title={COLUMN_TITLES.TODO}
                 status="TODO"
                 tasks={todoTasks}
                 onCreate={() => setCreateTaskStatus('TODO')}
                 onSelectTask={setSelectedTask}
               />
               <TaskColumn
-                title="In Progress"
+                title={COLUMN_TITLES.IN_PROGRESS}
                 status="IN_PROGRESS"
                 tasks={inProgressTasks}
                 onCreate={() => setCreateTaskStatus('IN_PROGRESS')}
                 onSelectTask={setSelectedTask}
               />
               <TaskColumn
-                title="Done"
+                title={COLUMN_TITLES.DONE}
                 status="DONE"
                 tasks={doneTasks}
                 onCreate={() => setCreateTaskStatus('DONE')}
@@ -284,19 +250,55 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               />
             </div>
           </DndContext>
+
+          {pagination && pagination.totalPages > 1 && (
+            <nav
+              aria-label="Task pagination"
+              className="mt-4 flex items-center justify-between text-sm text-muted"
+            >
+              <span>
+                Page {pagination.page} of {pagination.totalPages} ({pagination.total}{' '}
+                tasks)
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => current - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={page >= pagination.totalPages}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </nav>
+          )}
         </div>
 
-        <ActivityFeed activities={activities} />
+        <ActivityFeed activities={projectQuery.data?.activities ?? []} />
       </div>
 
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
           projectId={projectId}
-          members={members}
+          members={projectQuery.data?.members ?? []}
           onClose={() => setSelectedTask(null)}
-          onUpdated={handleTaskUpdated}
-          onDeleted={handleTaskDeleted}
+          onUpdated={(task) => {
+            setSelectedTask(task);
+            refreshProject();
+          }}
+          onDeleted={() => {
+            setSelectedTask(null);
+            refreshProject();
+          }}
         />
       )}
 
@@ -339,15 +341,12 @@ function TaskColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`min-h-96 rounded-xl p-4 transition ${
-        isOver ? 'bg-gray-200' : 'bg-gray-100'
-      }`}
+      aria-label={`${title} column`}
+      className={columnClass(status, isOver)}
     >
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-semibold">{title}</h2>
-        <span className="rounded-full bg-white px-2 py-1 text-xs">
-          {tasks.length}
-        </span>
+        <h2 className={cn('font-semibold', columnAccentClass(status))}>{title}</h2>
+        <Badge variant="default">{tasks.length}</Badge>
       </div>
 
       <div className="space-y-3">
@@ -360,19 +359,49 @@ function TaskColumn({
         ))}
       </div>
 
-      <button
+      <Button
+        variant="secondary"
+        className="mt-4 w-full border-dashed"
         onClick={onCreate}
-        className="mt-4 w-full rounded-lg border border-dashed bg-white p-3 text-sm"
       >
         + Add task
-      </button>
+      </Button>
     </section>
   );
+}
+
+function priorityVariant(priority: TaskPriority) {
+  switch (priority) {
+    case 'LOW':
+      return 'low' as const;
+    case 'MEDIUM':
+      return 'medium' as const;
+    case 'HIGH':
+      return 'high' as const;
+  }
+}
+
+function dueVariant(due: {
+  isOverdue: boolean;
+  isDueToday: boolean;
+  isDueSoon: boolean;
+}) {
+  if (due.isOverdue) {
+    return 'overdue' as const;
+  }
+  if (due.isDueToday) {
+    return 'due-today' as const;
+  }
+  if (due.isDueSoon) {
+    return 'due-soon' as const;
+  }
+  return 'default' as const;
 }
 
 function TaskCard({ task, onSelect }: { task: Task; onSelect: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: task.id });
+  const due = formatDueDate(task.dueDate);
 
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
@@ -382,34 +411,44 @@ function TaskCard({ task, onSelect }: { task: Task; onSelect: () => void }) {
     <article
       ref={setNodeRef}
       style={style}
-      className={`rounded-lg border bg-white p-4 shadow-sm ${
-        isDragging ? 'opacity-50' : ''
-      }`}
+      className={cn(
+        'rounded-xl border border-border bg-surface p-4 shadow-sm',
+        isDragging && 'opacity-60 ring-2 ring-primary',
+      )}
     >
       <div className="flex items-start gap-2">
         <button
           type="button"
           {...listeners}
           {...attributes}
-          className="cursor-grab pt-0.5 text-gray-400 hover:text-gray-600"
-          aria-label="Drag task"
+          className="cursor-grab rounded p-1 text-muted hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`Drag task: ${task.title}`}
         >
-          ⠿
+          <span aria-hidden="true">⠿</span>
         </button>
         <button
           type="button"
           onClick={onSelect}
-          className="flex-1 text-left"
+          className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <h3 className="font-medium">{task.title}</h3>
+          <h3 className="font-semibold text-foreground">{task.title}</h3>
           {task.description && (
-            <p className="mt-2 line-clamp-2 text-sm text-gray-500">
+            <p className="mt-2 line-clamp-2 text-sm text-muted">
               {task.description}
             </p>
           )}
-          <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-            <span>{task.priority}</span>
-            {task.assignee && <span>{task.assignee.name}</span>}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Badge variant={priorityVariant(task.priority)}>
+              {PRIORITY_LABELS[task.priority]}
+            </Badge>
+            {task.assignee && (
+              <Badge variant="info">{task.assignee.name}</Badge>
+            )}
+            {due && (
+              <Badge variant={dueVariant(due)} className={dueDateBadgeClass(due)}>
+                {dueDateLabel(due)}
+              </Badge>
+            )}
           </div>
         </button>
       </div>

@@ -1,24 +1,26 @@
 'use client';
 
+import { FormEvent, use, useId, useState } from 'react';
 import Link from 'next/link';
-import { FormEvent, use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { ActivityFeed } from '@/components/activity-feed';
 import { AppShell } from '@/components/app-shell';
 import { CreateProjectModal } from '@/components/create-project-modal';
 import { EditWorkspaceModal } from '@/components/edit-workspace-modal';
+import { LoadingScreen } from '@/components/loading-screen';
 import { useToast } from '@/components/toast-provider';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { CardDescription, CardTitle, cardClasses } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import { useWorkspace } from '@/hooks/use-queries';
 import { api } from '@/lib/api';
-import { Activity } from '@/types/activity';
-import { Project } from '@/types/project';
+import { canManageWorkspace, isWorkspaceOwner } from '@/lib/workspace-utils';
 import { WorkspaceMember, WorkspaceRole } from '@/types/member';
-
-interface WorkspaceDetail {
-  id: string;
-  name: string;
-  ownerId: string;
-}
 
 interface WorkspacePageProps {
   params: Promise<{ workspaceId: string }>;
@@ -26,57 +28,35 @@ interface WorkspacePageProps {
 
 export default function WorkspacePage({ params }: WorkspacePageProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { workspaceId } = use(params);
   const { showToast } = useToast();
+  const { data, isLoading, error } = useWorkspace(workspaceId);
+  const inviteEmailId = useId();
+  const inviteRoleId = useId();
 
-  const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>('MEMBER');
-  const [error, setError] = useState('');
 
-  const loadWorkspaceData = useCallback(async () => {
-    const [workspaceData, projectData, memberData, activityData] =
-      await Promise.all([
-        api<WorkspaceDetail>(`/workspaces/${workspaceId}`),
-        api<Project[]>(`/workspaces/${workspaceId}/projects`),
-        api<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`),
-        api<Activity[]>(`/workspaces/${workspaceId}/activity`),
-      ]);
+  const workspace = data?.workspace;
+  const canManage = canManageWorkspace(workspace?.currentUserRole);
 
-    setWorkspace(workspaceData);
-    setProjects(projectData);
-    setMembers(memberData);
-    setActivities(activityData);
-  }, [workspaceId]);
+  async function refreshWorkspace() {
+    await queryClient.invalidateQueries({ queryKey: ['workspace', workspaceId] });
+  }
 
-  useEffect(() => {
-    loadWorkspaceData()
-      .catch((loadError) => {
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Unable to load workspace',
-        );
-      })
-      .finally(() => setLoading(false));
-  }, [loadWorkspaceData]);
-
-  async function createProject(data: {
+  async function createProject(projectData: {
     name: string;
     description?: string;
   }) {
     await api(`/workspaces/${workspaceId}/projects`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(projectData),
     });
-    await loadWorkspaceData();
+    await refreshWorkspace();
     showToast('Project created', 'success');
   }
 
@@ -85,7 +65,7 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
       method: 'PATCH',
       body: JSON.stringify({ name }),
     });
-    await loadWorkspaceData();
+    await refreshWorkspace();
     showToast('Workspace updated', 'success');
   }
 
@@ -112,7 +92,7 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
 
       setInviteEmail('');
       setInviteRole('MEMBER');
-      await loadWorkspaceData();
+      await refreshWorkspace();
 
       if ('inviteSent' in result) {
         showToast(`Invite sent to ${result.email}`, 'success');
@@ -130,10 +110,17 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
     }
   }
 
-  if (loading) {
+  if (isLoading) {
+    return <LoadingScreen message="Loading workspace..." />;
+  }
+
+  if (error || !workspace) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
-        Loading workspace...
+      <main
+        className="flex min-h-screen items-center justify-center bg-background p-8 text-destructive"
+        role="alert"
+      >
+        {error instanceof Error ? error.message : 'Unable to load workspace'}
       </main>
     );
   }
@@ -142,138 +129,135 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
     <AppShell
       breadcrumbs={[
         { label: 'Dashboard', href: '/dashboard' },
-        { label: workspace?.name ?? 'Workspace' },
+        { label: workspace.name },
       ]}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{workspace?.name}</h1>
-          <p className="mt-1 text-gray-500">
-            Manage projects, members, and activity.
+          <h1 className="text-3xl font-bold text-foreground">{workspace.name}</h1>
+          <p className="mt-2 flex items-center gap-2 text-muted">
+            Your role:
+            <Badge variant="info">{workspace.currentUserRole}</Badge>
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowEditModal(true)}
-            className="rounded border px-4 py-2 text-sm"
-          >
-            Settings
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="rounded bg-black px-4 py-2 text-sm text-white"
-          >
-            + New Project
-          </button>
-        </div>
+        {canManage && (
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setShowEditModal(true)}>
+              Settings
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)}>+ New Project</Button>
+          </div>
+        )}
       </div>
-
-      {error && (
-        <div className="mt-6 rounded border p-4 text-red-600">{error}</div>
-      )}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-3">
         <div className="space-y-8 lg:col-span-2">
-          <section>
-            <h2 className="text-lg font-semibold">Projects</h2>
+          <section aria-labelledby="projects-heading">
+            <h2 id="projects-heading" className="text-xl font-semibold text-foreground">
+              Projects
+            </h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {projects.map((project) => (
+              {(data?.projects ?? []).map((project, index) => (
                 <Link
                   key={project.id}
                   href={`/projects/${project.id}`}
-                  className="rounded-lg border bg-white p-5 transition hover:shadow-md"
+                  className={cardClasses(true)}
+                  style={{
+                    borderLeftWidth: '4px',
+                    borderLeftColor: ['#6366f1', '#0d9488', '#f59e0b'][index % 3],
+                  }}
                 >
-                  <h3 className="font-semibold">{project.name}</h3>
+                  <CardTitle className="text-base">{project.name}</CardTitle>
                   {project.description && (
-                    <p className="mt-2 line-clamp-2 text-sm text-gray-500">
+                    <CardDescription className="line-clamp-2">
                       {project.description}
-                    </p>
+                    </CardDescription>
                   )}
-                  <p className="mt-4 text-sm text-gray-500">
+                  <CardDescription className="mt-4">
                     {project._count.tasks} tasks
-                  </p>
+                  </CardDescription>
                 </Link>
               ))}
             </div>
-            {!error && projects.length === 0 && (
-              <div className="mt-4 rounded-lg border border-dashed bg-white p-10 text-center">
-                <p className="text-gray-600">No projects yet.</p>
-              </div>
-            )}
           </section>
 
-          <section>
-            <h2 className="text-lg font-semibold">Members</h2>
-            <div className="mt-4 overflow-hidden rounded-lg border bg-white">
+          <section aria-labelledby="members-heading">
+            <h2 id="members-heading" className="text-xl font-semibold text-foreground">
+              Members
+            </h2>
+            <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
               <table className="w-full text-left text-sm">
-                <thead className="border-b bg-gray-50">
+                <thead className="border-b border-border bg-surface-muted/60">
                   <tr>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Role</th>
+                    <th scope="col" className="px-4 py-3 font-semibold text-foreground">
+                      Name
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-semibold text-foreground">
+                      Email
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-semibold text-foreground">
+                      Role
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((member) => (
-                    <tr key={member.id} className="border-b last:border-b-0">
-                      <td className="px-4 py-3">{member.user.name}</td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {member.user.email}
+                  {(data?.members ?? []).map((member) => (
+                    <tr key={member.id} className="border-b border-border last:border-b-0">
+                      <td className="px-4 py-3 font-medium">{member.user.name}</td>
+                      <td className="px-4 py-3 text-muted">{member.user.email}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant="info">{member.role}</Badge>
                       </td>
-                      <td className="px-4 py-3">{member.role}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            <form
-              onSubmit={handleInvite}
-              className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4"
-            >
-              <div className="min-w-48 flex-1">
-                <label className="mb-1 block text-sm font-medium">
-                  Invite by email
-                </label>
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(event) => setInviteEmail(event.target.value)}
-                  className="w-full rounded border p-2"
-                  placeholder="colleague@example.com"
-                  required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Role</label>
-                <select
-                  value={inviteRole}
-                  onChange={(event) =>
-                    setInviteRole(event.target.value as WorkspaceRole)
-                  }
-                  className="rounded border p-2"
+            {canManage && (
+              <>
+                <form
+                  onSubmit={handleInvite}
+                  className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm"
                 >
-                  <option value="MEMBER">Member</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
-              </div>
-              <button
-                type="submit"
-                disabled={inviting}
-                className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-              >
-                {inviting ? 'Inviting...' : 'Invite member'}
-              </button>
-            </form>
-            <p className="mt-2 text-xs text-gray-500">
-              If the email isn&apos;t registered yet, an invite link is created
-              and they&apos;ll see it when they sign up.
-            </p>
+                  <div className="min-w-48 flex-1">
+                    <Label htmlFor={inviteEmailId}>Invite by email</Label>
+                    <Input
+                      id={inviteEmailId}
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(event) => setInviteEmail(event.target.value)}
+                      placeholder="colleague@example.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={inviteRoleId}>Role</Label>
+                    <Select
+                      id={inviteRoleId}
+                      value={inviteRole}
+                      onChange={(event) =>
+                        setInviteRole(event.target.value as WorkspaceRole)
+                      }
+                    >
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                    </Select>
+                  </div>
+                  <Button type="submit" disabled={inviting}>
+                    {inviting ? 'Inviting...' : 'Invite member'}
+                  </Button>
+                </form>
+                <p className="mt-2 text-xs text-muted">
+                  Unregistered emails receive a pending invite on signup.
+                </p>
+              </>
+            )}
           </section>
         </div>
 
-        <ActivityFeed activities={activities} />
+        <ActivityFeed activities={data?.activities ?? []} />
       </div>
 
       {showCreateModal && (
@@ -283,12 +267,16 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
         />
       )}
 
-      {showEditModal && workspace && (
+      {showEditModal && (
         <EditWorkspaceModal
           name={workspace.name}
           onClose={() => setShowEditModal(false)}
           onSubmit={updateWorkspace}
-          onDelete={deleteWorkspace}
+          onDelete={
+            isWorkspaceOwner(workspace.currentUserRole)
+              ? deleteWorkspace
+              : undefined
+          }
         />
       )}
     </AppShell>

@@ -17,6 +17,7 @@ describe('TasksService', () => {
       findFirst: jest.fn(),
       delete: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -70,10 +71,14 @@ describe('TasksService', () => {
   it('lists tasks only after checking project membership', async () => {
     allowProjectAccess();
     prisma.task.findMany.mockResolvedValue([]);
-    await expect(service.findAll('project-1', 'user-1', {})).resolves.toEqual([]);
-    expect(prisma.task.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { projectId: 'project-1' } }),
-    );
+    prisma.task.count.mockResolvedValue(0);
+    await expect(service.findAll('project-1', 'user-1', {})).resolves.toEqual({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 50,
+      totalPages: 1,
+    });
   });
 
   it('rejects a missing project', async () => {

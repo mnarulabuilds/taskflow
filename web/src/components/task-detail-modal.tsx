@@ -1,8 +1,14 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useId, useState } from 'react';
 
 import { Modal } from '@/components/modal';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { TaskComment } from '@/types/comment';
 import { Task, TaskPriority, TaskStatus } from '@/types/task';
@@ -25,6 +31,14 @@ export function TaskDetailModal({
   onUpdated,
   onDeleted,
 }: TaskDetailModalProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const statusId = useId();
+  const priorityId = useId();
+  const dueDateId = useId();
+  const assigneeId = useId();
+  const commentId = useId();
+
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
   const [status, setStatus] = useState<TaskStatus>(task.status);
@@ -32,7 +46,7 @@ export function TaskDetailModal({
   const [dueDate, setDueDate] = useState(
     task.dueDate ? task.dueDate.slice(0, 10) : '',
   );
-  const [assigneeId, setAssigneeId] = useState(task.assignee?.id ?? '');
+  const [assignee, setAssignee] = useState(task.assignee?.id ?? '');
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -65,7 +79,7 @@ export function TaskDetailModal({
             status,
             priority,
             dueDate: dueDate || null,
-            assigneeId: assigneeId || null,
+            assigneeId: assignee || null,
           }),
         },
       );
@@ -139,76 +153,76 @@ export function TaskDetailModal({
   }
 
   return (
-    <Modal title="Edit task" onClose={onClose}>
+    <Modal title="Edit task" onClose={onClose} size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium">Title</label>
-          <input
+          <Label htmlFor={titleId}>Title</Label>
+          <Input
+            id={titleId}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            className="w-full rounded border p-2"
             required
             minLength={3}
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium">Description</label>
-          <textarea
+          <Label htmlFor={descriptionId}>Description</Label>
+          <Textarea
+            id={descriptionId}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="w-full rounded border p-2"
             rows={3}
           />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Status</label>
-            <select
+            <Label htmlFor={statusId}>Status</Label>
+            <Select
+              id={statusId}
               value={status}
               onChange={(event) =>
                 setStatus(event.target.value as TaskStatus)
               }
-              className="w-full rounded border p-2"
             >
-              <option value="TODO">Todo</option>
-              <option value="IN_PROGRESS">In Progress</option>
+              <option value="TODO">To do</option>
+              <option value="IN_PROGRESS">In progress</option>
               <option value="DONE">Done</option>
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Priority</label>
-            <select
+            <Label htmlFor={priorityId}>Priority</Label>
+            <Select
+              id={priorityId}
               value={priority}
               onChange={(event) =>
                 setPriority(event.target.value as TaskPriority)
               }
-              className="w-full rounded border p-2"
             >
               <option value="LOW">Low</option>
               <option value="MEDIUM">Medium</option>
               <option value="HIGH">High</option>
-            </select>
+            </Select>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Due date</label>
-            <input
+            <Label htmlFor={dueDateId}>Due date</Label>
+            <Input
+              id={dueDateId}
               type="date"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
-              className="w-full rounded border p-2"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Assignee</label>
-            <select
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-              className="w-full rounded border p-2"
+            <Label htmlFor={assigneeId}>Assignee</Label>
+            <Select
+              id={assigneeId}
+              value={assignee}
+              onChange={(event) => setAssignee(event.target.value)}
             >
               <option value="">Unassigned</option>
               {members.map((member) => (
@@ -216,77 +230,72 @@ export function TaskDetailModal({
                   {member.user.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
-        <section className="rounded border p-3">
-          <h3 className="text-sm font-medium">Comments</h3>
+        <section
+          aria-labelledby="comments-heading"
+          className="rounded-lg border border-border bg-surface-muted/40 p-4"
+        >
+          <h3 id="comments-heading" className="text-sm font-semibold text-foreground">
+            Comments
+          </h3>
           <div className="mt-3 max-h-40 space-y-3 overflow-y-auto">
             {comments.length === 0 && (
-              <p className="text-sm text-gray-500">No comments yet.</p>
+              <p className="text-sm text-muted">No comments yet.</p>
             )}
             {comments.map((comment) => (
               <article key={comment.id} className="text-sm">
-                <p className="font-medium">{comment.author.name}</p>
-                <p className="text-gray-700">{comment.content}</p>
-                <p className="text-xs text-gray-400">
-                  {new Date(comment.createdAt).toLocaleString()}
+                <p className="font-semibold text-primary">{comment.author.name}</p>
+                <p className="text-foreground">{comment.content}</p>
+                <p className="text-xs text-muted">
+                  <time dateTime={comment.createdAt}>
+                    {new Date(comment.createdAt).toLocaleString()}
+                  </time>
                 </p>
               </article>
             ))}
           </div>
           <form onSubmit={handleAddComment} className="mt-3 flex gap-2">
-            <input
+            <Label htmlFor={commentId} className="sr-only">
+              Add a comment
+            </Label>
+            <Input
+              id={commentId}
               value={commentText}
               onChange={(event) => setCommentText(event.target.value)}
               placeholder="Add a comment..."
-              className="flex-1 rounded border p-2 text-sm"
+              className="flex-1 text-sm"
             />
-            <button
-              type="submit"
-              disabled={postingComment}
-              className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-            >
+            <Button type="submit" size="sm" disabled={postingComment}>
               Post
-            </button>
+            </Button>
           </form>
         </section>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <Alert variant="error">{error}</Alert>}
 
         <div className="flex items-center justify-between pt-2">
-          <button
+          <Button
             type="button"
+            variant={confirmDelete ? 'destructive-solid' : 'destructive'}
             onClick={handleDelete}
             disabled={deleting || saving}
-            className={`rounded border px-4 py-2 text-sm disabled:opacity-50 ${
-              confirmDelete
-                ? 'border-red-600 bg-red-600 text-white'
-                : 'border-red-200 text-red-600'
-            }`}
           >
             {deleting
               ? 'Deleting...'
               : confirmDelete
                 ? 'Confirm delete'
                 : 'Delete task'}
-          </button>
+          </Button>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded border px-4 py-2 text-sm"
-            >
+            <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || deleting}
-              className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" disabled={saving || deleting}>
               {saving ? 'Saving...' : 'Save changes'}
-            </button>
+            </Button>
           </div>
         </div>
       </form>

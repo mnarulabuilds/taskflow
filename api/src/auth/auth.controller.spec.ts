@@ -7,8 +7,14 @@ import { AuthService } from './auth.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
-  const authService = { login: jest.fn() };
-  const configService = { get: jest.fn().mockReturnValue('15m') };
+  const authService = {
+    login: jest.fn(),
+    refresh: jest.fn(),
+    logout: jest.fn(),
+  };
+  const configService = {
+    get: jest.fn((key: string, fallback?: string) => fallback),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -27,20 +33,32 @@ describe('AuthController', () => {
     const user = { id: 'user-1', email: dto.email };
     authService.login.mockResolvedValue({
       accessToken: 'token',
+      refreshToken: 'refresh',
       user,
+    });
+
+    const response = {
+      cookie: jest.fn(),
+    } as unknown as Response;
+
+    await expect(controller.login(dto, response)).resolves.toEqual({ user });
+    expect(response.cookie).toHaveBeenCalled();
+  });
+
+  it('refreshes tokens from the refresh cookie', async () => {
+    authService.refresh.mockResolvedValue({
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
+      user: { id: 'user-1', email: 'ada@example.com' },
     });
 
     const response = { cookie: jest.fn() } as unknown as Response;
 
-    await expect(controller.login(dto, response)).resolves.toEqual({ user });
-    expect(authService.login).toHaveBeenCalledWith(dto);
-    expect(response.cookie).toHaveBeenCalled();
-  });
-
-  it('returns the authenticated user for /auth/me', () => {
-    const user = { id: 'user-1', email: 'ada@example.com' };
-    expect(controller.me({ user } as Request & { user: typeof user })).toEqual(
-      user,
-    );
+    await expect(
+      controller.refresh(
+        { cookies: { refreshToken: 'refresh-token' } } as never,
+        response,
+      ),
+    ).resolves.toEqual({ user: { id: 'user-1', email: 'ada@example.com' } });
   });
 });

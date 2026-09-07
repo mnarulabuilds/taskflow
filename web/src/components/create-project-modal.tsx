@@ -1,8 +1,13 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useId, useState } from 'react';
 
 import { Modal } from '@/components/modal';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CreateProjectModalProps {
   onClose: () => void;
@@ -13,6 +18,8 @@ export function CreateProjectModal({
   onClose,
   onSubmit,
 }: CreateProjectModalProps) {
+  const nameId = useId();
+  const descriptionId = useId();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -44,11 +51,11 @@ export function CreateProjectModal({
     <Modal title="New project" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium">Name</label>
-          <input
+          <Label htmlFor={nameId}>Name</Label>
+          <Input
+            id={nameId}
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="w-full rounded border p-2"
             placeholder="Website redesign"
             required
             minLength={2}
@@ -57,30 +64,24 @@ export function CreateProjectModal({
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            Description (optional)
-          </label>
-          <textarea
+          <Label htmlFor={descriptionId}>Description (optional)</Label>
+          <Textarea
+            id={descriptionId}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="w-full rounded border p-2"
             rows={3}
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <Alert variant="error">{error}</Alert>}
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded border px-4 py-2 text-sm">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={submitting}>
             {submitting ? 'Creating...' : 'Create project'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

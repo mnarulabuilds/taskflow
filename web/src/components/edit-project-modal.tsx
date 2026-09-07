@@ -1,8 +1,13 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useId, useState } from 'react';
 
 import { Modal } from '@/components/modal';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 interface EditProjectModalProps {
   name: string;
@@ -19,6 +24,8 @@ export function EditProjectModal({
   onSubmit,
   onDelete,
 }: EditProjectModalProps) {
+  const nameId = useId();
+  const descriptionId = useId();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription ?? '');
   const [submitting, setSubmitting] = useState(false);
@@ -78,59 +85,51 @@ export function EditProjectModal({
     <Modal title="Project settings" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium">Name</label>
-          <input
+          <Label htmlFor={nameId}>Name</Label>
+          <Input
+            id={nameId}
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="w-full rounded border p-2"
             required
             minLength={2}
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium">Description</label>
-          <textarea
+          <Label htmlFor={descriptionId}>Description</Label>
+          <Textarea
+            id={descriptionId}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="w-full rounded border p-2"
             rows={3}
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <Alert variant="error">{error}</Alert>}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           {onDelete && (
-            <button
+            <Button
               type="button"
+              variant={confirmDelete ? 'destructive-solid' : 'destructive'}
               onClick={handleDelete}
               disabled={deleting || submitting}
-              className={`rounded border px-4 py-2 text-sm disabled:opacity-50 ${
-                confirmDelete
-                  ? 'border-red-600 bg-red-600 text-white'
-                  : 'border-red-200 text-red-600'
-              }`}
             >
               {deleting
                 ? 'Deleting...'
                 : confirmDelete
                   ? 'Confirm delete'
                   : 'Delete project'}
-            </button>
+            </Button>
           )}
 
           <div className="ml-auto flex gap-2">
-            <button type="button" onClick={onClose} className="rounded border px-4 py-2 text-sm">
+            <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || deleting}
-              className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" disabled={submitting || deleting}>
               {submitting ? 'Saving...' : 'Save changes'}
-            </button>
+            </Button>
           </div>
         </div>
       </form>

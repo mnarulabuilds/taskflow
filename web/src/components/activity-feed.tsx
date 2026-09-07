@@ -1,5 +1,7 @@
 import { Activity, ActivityType } from '@/types/activity';
 
+import { Card, CardTitle } from '@/components/ui/card';
+
 const LABELS: Record<ActivityType, string> = {
   WORKSPACE_CREATED: 'created the workspace',
   WORKSPACE_UPDATED: 'updated the workspace',
@@ -49,26 +51,33 @@ export function ActivityFeed({
   title = 'Recent activity',
 }: ActivityFeedProps) {
   return (
-    <section className="rounded-lg border bg-white p-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <Card aria-labelledby="activity-feed-title">
+      <CardTitle id="activity-feed-title" className="text-lg">
+        {title}
+      </CardTitle>
 
       {activities.length === 0 ? (
-        <p className="mt-4 text-sm text-gray-500">No activity yet.</p>
+        <p className="mt-4 text-sm text-muted">No activity yet.</p>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="mt-4 space-y-3" aria-live="polite">
           {activities.map((activity) => (
-            <li key={activity.id} className="text-sm">
-              <span className="font-medium">{activity.user.name}</span>{' '}
-              <span className="text-gray-600">
+            <li
+              key={activity.id}
+              className="rounded-lg border border-border bg-surface-muted/40 p-3 text-sm"
+            >
+              <span className="font-semibold text-primary">{activity.user.name}</span>{' '}
+              <span className="text-muted">
                 {LABELS[activity.type]} {activityDetail(activity)}
               </span>
-              <p className="mt-1 text-xs text-gray-400">
-                {new Date(activity.createdAt).toLocaleString()}
+              <p className="mt-1 text-xs text-muted">
+                <time dateTime={activity.createdAt}>
+                  {new Date(activity.createdAt).toLocaleString()}
+                </time>
               </p>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }

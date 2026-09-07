@@ -51,7 +51,7 @@ export class WorkspacesService {
   }
 
   async findOne(workspaceId: string, currentUserId: string) {
-    await this.assertMembership(workspaceId, currentUserId);
+    const member = await this.assertMembership(workspaceId, currentUserId);
 
     const workspace = await this.prisma.workspace.findUnique({
       where: { id: workspaceId },
@@ -71,7 +71,7 @@ export class WorkspacesService {
       throw new NotFoundException('Workspace not found.');
     }
 
-    return workspace;
+    return { ...workspace, currentUserRole: member.role };
   }
 
   async update(workspaceId: string, currentUserId: string, name: string) {

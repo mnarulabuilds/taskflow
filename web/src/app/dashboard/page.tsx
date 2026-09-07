@@ -2,104 +2,99 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app-shell';
 import { CreateWorkspaceModal } from '@/components/create-workspace-modal';
+import { LoadingScreen } from '@/components/loading-screen';
 import { PendingInvites } from '@/components/pending-invites';
 import { useToast } from '@/components/toast-provider';
-import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardTitle, cardClasses } from '@/components/ui/card';
+import { usePendingInvites, useWorkspaces } from '@/hooks/use-queries';
+import { useAuth } from '@/providers/auth-provider';
 import { api } from '@/lib/api';
-import { WorkspaceInvite } from '@/types/notification';
-import { Workspace } from '@/types/workspace';
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, loading } = useAuth();
   const { showToast } = useToast();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
+  const workspacesQuery = useWorkspaces();
+  const invitesQuery = usePendingInvites();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  async function loadDashboard() {
-    const [workspaceData, inviteData] = await Promise.all([
-      api<Workspace[]>('/workspaces'),
-      api<WorkspaceInvite[]>('/invites/pending'),
-    ]);
-    setWorkspaces(workspaceData);
-    setInvites(inviteData);
-  }
-
   useEffect(() => {
-    if (!user) {
-      return;
+    if (!loading && !user) {
+      router.replace('/login');
     }
+  }, [loading, user, router]);
 
-    loadDashboard().catch((error) => {
-      showToast(
-        error instanceof Error ? error.message : 'Unable to load dashboard',
-      );
-    });
-  }, [user, showToast]);
+  async function refreshDashboard() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] }),
+      queryClient.invalidateQueries({ queryKey: ['invites', 'pending'] }),
+    ]);
+  }
 
   async function createWorkspace(name: string) {
     await api('/workspaces', {
       method: 'POST',
       body: JSON.stringify({ name }),
     });
-    await loadDashboard();
+    await refreshDashboard();
     showToast('Workspace created', 'success');
   }
 
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center p-8">
-        Loading TaskFlow...
-      </main>
-    );
+  if (loading || workspacesQuery.isLoading) {
+    return <LoadingScreen message="Loading TaskFlow..." />;
   }
 
-  return (
-    <AppShell email={user?.email}>
-      <PendingInvites invites={invites} onAccepted={loadDashboard} />
+  const workspaces = workspacesQuery.data ?? [];
+  const invites = invitesQuery.data ?? [];
 
-      <div className="flex items-center justify-between">
+  return (
+    <AppShell>
+      <PendingInvites invites={invites} onAccepted={refreshDashboard} />
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="mt-1 text-gray-600">Welcome to TaskFlow.</p>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="mt-1 text-muted">Pick a workspace or create a new one.</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="rounded bg-black px-4 py-2 text-sm text-white"
-        >
-          + New Workspace
-        </button>
+        <Button onClick={() => setShowCreateModal(true)}>+ New Workspace</Button>
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {workspaces.map((workspace) => (
+        {workspaces.map((workspace, index) => (
           <Link
             key={workspace.id}
             href={`/workspaces/${workspace.id}`}
-            className="block rounded-lg border bg-white p-5 transition hover:shadow-md"
+            className={cardClasses(true)}
+            style={{
+              borderTopWidth: '3px',
+              borderTopColor: ['#6366f1', '#0d9488', '#f59e0b', '#ec4899'][
+                index % 4
+              ],
+            }}
           >
-            <h2 className="font-semibold">{workspace.name}</h2>
-            <div className="mt-4 flex gap-4 text-sm text-gray-500">
+            <CardTitle className="text-base">{workspace.name}</CardTitle>
+            <CardDescription className="mt-3 flex gap-4">
               <span>{workspace._count.projects} projects</span>
               <span>{workspace._count.members} members</span>
-            </div>
+            </CardDescription>
           </Link>
         ))}
       </div>
 
       {workspaces.length === 0 && (
-        <div className="mt-6 rounded-lg border border-dashed bg-white p-10 text-center">
-          <p className="text-gray-600">You don&apos;t have any workspaces yet.</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="mt-4 rounded bg-black px-4 py-2 text-sm text-white"
-          >
+        <Card className="mt-6 border-dashed text-center">
+          <p className="text-muted">You don&apos;t have any workspaces yet.</p>
+          <Button className="mt-4" onClick={() => setShowCreateModal(true)}>
             Create your first workspace
-          </button>
-        </div>
+          </Button>
+        </Card>
       )}
 
       {showCreateModal && (

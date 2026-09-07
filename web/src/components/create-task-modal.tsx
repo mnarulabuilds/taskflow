@@ -1,8 +1,13 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useId, useState } from 'react';
 
 import { Modal } from '@/components/modal';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { STATUS_LABELS } from '@/lib/task-styles';
 import { TaskStatus } from '@/types/task';
 
 interface CreateTaskModalProps {
@@ -16,16 +21,10 @@ export function CreateTaskModal({
   onClose,
   onSubmit,
 }: CreateTaskModalProps) {
+  const titleId = useId();
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  const statusLabel =
-    status === 'TODO'
-      ? 'Todo'
-      : status === 'IN_PROGRESS'
-        ? 'In Progress'
-        : 'Done';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,14 +46,14 @@ export function CreateTaskModal({
   }
 
   return (
-    <Modal title={`New task — ${statusLabel}`} onClose={onClose}>
+    <Modal title={`New task — ${STATUS_LABELS[status]}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium">Title</label>
-          <input
+          <Label htmlFor={titleId}>Title</Label>
+          <Input
+            id={titleId}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            className="w-full rounded border p-2"
             placeholder="Write documentation"
             required
             minLength={3}
@@ -62,19 +61,15 @@ export function CreateTaskModal({
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <Alert variant="error">{error}</Alert>}
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded border px-4 py-2 text-sm">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={submitting}>
             {submitting ? 'Creating...' : 'Create task'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>
