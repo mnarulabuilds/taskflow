@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, use, useCallback, useEffect, useState } from 'react';
 
+import { CreateProjectModal } from '@/components/create-project-modal';
+import { useToast } from '@/components/toast-provider';
 import { api } from '@/lib/api';
-import { getAccessToken, removeAccessToken } from '@/lib/auth';
 import { Project } from '@/types/project';
 import { WorkspaceMember, WorkspaceRole } from '@/types/member';
 
@@ -16,32 +16,23 @@ interface WorkspacePageProps {
 }
 
 export default function WorkspacePage({ params }: WorkspacePageProps) {
-  const router = useRouter();
   const { workspaceId } = use(params);
+  const { showToast } = useToast();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>('MEMBER');
   const [error, setError] = useState('');
 
-  async function loadWorkspaceData() {
-    const token = getAccessToken();
-
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
-
+  const loadWorkspaceData = useCallback(async () => {
     try {
       const [projectData, memberData] = await Promise.all([
-        api<Project[]>(`/workspaces/${workspaceId}/projects`, { token }),
-        api<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`, {
-          token,
-        }),
+        api<Project[]>(`/workspaces/${workspaceId}/projects`),
+        api<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`),
       ]);
 
       setProjects(projectData);
@@ -55,68 +46,33 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [workspaceId]);
 
   useEffect(() => {
     loadWorkspaceData();
-  }, [router, workspaceId]);
+  }, [loadWorkspaceData]);
 
-  async function createProject() {
-    const name = window.prompt('Project name');
+  async function createProject(data: {
+    name: string;
+    description?: string;
+  }) {
+    await api(`/workspaces/${workspaceId}/projects`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
 
-    if (!name?.trim()) {
-      return;
-    }
-
-    const description = window.prompt('Project description') ?? '';
-    const token = getAccessToken();
-
-    if (!token) {
-      removeAccessToken();
-      router.replace('/login');
-      return;
-    }
-
-    try {
-      setCreating(true);
-
-      await api(`/workspaces/${workspaceId}/projects`, {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || undefined,
-        }),
-      });
-
-      await loadWorkspaceData();
-    } catch (createError) {
-      window.alert(
-        createError instanceof Error
-          ? createError.message
-          : 'Unable to create project',
-      );
-    } finally {
-      setCreating(false);
-    }
+    await loadWorkspaceData();
+    showToast('Project created', 'success');
   }
 
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const token = getAccessToken();
-
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
 
     try {
       setInviting(true);
 
       await api(`/workspaces/${workspaceId}/members`, {
         method: 'POST',
-        token,
         body: JSON.stringify({
           email: inviteEmail.trim(),
           role: inviteRole,
@@ -126,8 +82,9 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
       setInviteEmail('');
       setInviteRole('MEMBER');
       await loadWorkspaceData();
+      showToast('Member invited', 'success');
     } catch (inviteError) {
-      window.alert(
+      showToast(
         inviteError instanceof Error
           ? inviteError.message
           : 'Unable to invite member',
@@ -138,7 +95,11 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
   }
 
   if (loading) {
-    return <main className="p-8">Loading workspace...</main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center p-8">
+        Loading workspace...
+      </main>
+    );
   }
 
   return (
@@ -157,11 +118,10 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
           </div>
 
           <button
-            onClick={createProject}
-            disabled={creating}
-            className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+            onClick={() => setShowCreateModal(true)}
+            className="rounded bg-black px-4 py-2 text-sm text-white"
           >
-            {creating ? 'Creating...' : '+ New Project'}
+            + New Project
           </button>
         </div>
 
@@ -272,6 +232,13 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
           </div>
         </section>
       </div>
+
+      {showCreateModal && (
+        <CreateProjectModal
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={createProject}
+        />
+      )}
     </main>
   );
 }

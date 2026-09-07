@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { use, useCallback, useEffect, useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -13,9 +12,10 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 
+import { CreateTaskModal } from '@/components/create-task-modal';
 import { TaskDetailModal } from '@/components/task-detail-modal';
+import { useToast } from '@/components/toast-provider';
 import { api } from '@/lib/api';
-import { getAccessToken } from '@/lib/auth';
 import { ProjectDetail } from '@/types/project';
 import { WorkspaceMember } from '@/types/member';
 import { Task, TaskStatus } from '@/types/task';
@@ -27,15 +27,17 @@ interface ProjectPageProps {
 }
 
 export default function ProjectPage({ params }: ProjectPageProps) {
-  const router = useRouter();
   const { projectId } = use(params);
+  const { showToast } = useToast();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [createTaskStatus, setCreateTaskStatus] = useState<TaskStatus | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
   const sensors = useSensors(
@@ -48,24 +50,14 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   const inProgressTasks = tasks.filter((task) => task.status === 'IN_PROGRESS');
   const doneTasks = tasks.filter((task) => task.status === 'DONE');
 
-  async function loadProjectBoard() {
-    const token = getAccessToken();
-
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
-
+  const loadProjectBoard = useCallback(async () => {
     try {
-      const projectData = await api<ProjectDetail>(`/projects/${projectId}`, {
-        token,
-      });
+      const projectData = await api<ProjectDetail>(`/projects/${projectId}`);
 
       const [taskData, memberData] = await Promise.all([
-        api<Task[]>(`/projects/${projectId}/tasks`, { token }),
+        api<Task[]>(`/projects/${projectId}/tasks`),
         api<WorkspaceMember[]>(
           `/workspaces/${projectData.workspaceId}/members`,
-          { token },
         ),
       ]);
 
@@ -81,55 +73,31 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [projectId]);
 
-  async function createTask(status: TaskStatus) {
-    const title = window.prompt('Task title');
+  useEffect(() => {
+    loadProjectBoard();
+  }, [loadProjectBoard]);
 
-    if (!title?.trim()) {
+  async function createTask(title: string) {
+    if (!createTaskStatus) {
       return;
     }
 
-    const token = getAccessToken();
+    await api(`/projects/${projectId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title,
+        status: createTaskStatus,
+        priority: 'MEDIUM',
+      }),
+    });
 
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
-
-    try {
-      setCreating(true);
-
-      await api(`/projects/${projectId}/tasks`, {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          title: title.trim(),
-          status,
-          priority: 'MEDIUM',
-        }),
-      });
-
-      await loadProjectBoard();
-    } catch (createError) {
-      window.alert(
-        createError instanceof Error
-          ? createError.message
-          : 'Unable to create task',
-      );
-    } finally {
-      setCreating(false);
-    }
+    await loadProjectBoard();
+    showToast('Task created', 'success');
   }
 
   async function updateTaskStatus(taskId: string, status: TaskStatus) {
-    const token = getAccessToken();
-
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
-
     const previousTasks = tasks;
 
     setTasks((currentTasks) =>
@@ -141,12 +109,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     try {
       await api(`/projects/${projectId}/tasks/${taskId}`, {
         method: 'PATCH',
-        token,
         body: JSON.stringify({ status }),
       });
     } catch (updateError) {
       setTasks(previousTasks);
-      window.alert(
+      showToast(
         updateError instanceof Error
           ? updateError.message
           : 'Unable to update task',
@@ -186,24 +153,20 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     );
   }
 
-  useEffect(() => {
-    loadProjectBoard();
-  }, [projectId]);
-
   if (loading) {
-    return <main className="p-8">Loading tasks...</main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center p-8">
+        Loading tasks...
+      </main>
+    );
   }
-
-  const token = getAccessToken();
 
   return (
     <main className="min-h-screen bg-white">
       <div className="mx-auto max-w-7xl p-6">
         <Link
           href={
-            project
-              ? `/workspaces/${project.workspaceId}`
-              : '/dashboard'
+            project ? `/workspaces/${project.workspaceId}` : '/dashboard'
           }
           className="text-sm text-gray-500"
         >
@@ -229,39 +192,43 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               title="Todo"
               status="TODO"
               tasks={todoTasks}
-              creating={creating}
-              onCreate={createTask}
+              onCreate={() => setCreateTaskStatus('TODO')}
               onSelectTask={setSelectedTask}
             />
             <TaskColumn
               title="In Progress"
               status="IN_PROGRESS"
               tasks={inProgressTasks}
-              creating={creating}
-              onCreate={createTask}
+              onCreate={() => setCreateTaskStatus('IN_PROGRESS')}
               onSelectTask={setSelectedTask}
             />
             <TaskColumn
               title="Done"
               status="DONE"
               tasks={doneTasks}
-              creating={creating}
-              onCreate={createTask}
+              onCreate={() => setCreateTaskStatus('DONE')}
               onSelectTask={setSelectedTask}
             />
           </div>
         </DndContext>
       </div>
 
-      {selectedTask && token && (
+      {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
           projectId={projectId}
-          token={token}
           members={members}
           onClose={() => setSelectedTask(null)}
           onUpdated={handleTaskUpdated}
           onDeleted={handleTaskDeleted}
+        />
+      )}
+
+      {createTaskStatus && (
+        <CreateTaskModal
+          status={createTaskStatus}
+          onClose={() => setCreateTaskStatus(null)}
+          onSubmit={createTask}
         />
       )}
     </main>
@@ -272,8 +239,7 @@ interface TaskColumnProps {
   title: string;
   status: TaskStatus;
   tasks: Task[];
-  creating: boolean;
-  onCreate: (status: TaskStatus) => void;
+  onCreate: () => void;
   onSelectTask: (task: Task) => void;
 }
 
@@ -281,7 +247,6 @@ function TaskColumn({
   title,
   status,
   tasks,
-  creating,
   onCreate,
   onSelectTask,
 }: TaskColumnProps) {
@@ -312,9 +277,8 @@ function TaskColumn({
       </div>
 
       <button
-        onClick={() => onCreate(status)}
-        disabled={creating}
-        className="mt-4 w-full rounded-lg border border-dashed bg-white p-3 text-sm disabled:opacity-50"
+        onClick={onCreate}
+        className="mt-4 w-full rounded-lg border border-dashed bg-white p-3 text-sm"
       >
         + Add task
       </button>

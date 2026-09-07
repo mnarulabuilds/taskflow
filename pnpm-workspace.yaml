@@ -5,6 +5,7 @@ allowBuilds:
   '@parcel/watcher': false
   '@prisma/client': false
   '@prisma/engines': false
+  '@scarf/scarf': true
   bcrypt: false
   prisma: false
   sharp: true

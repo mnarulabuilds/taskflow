@@ -1,8 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-if (!API_URL) {
-  throw new Error('NEXT_PUBLIC_API_URL is not configured');
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 type ApiOptions = RequestInit & {
   token?: string;
@@ -16,12 +12,11 @@ export async function api<T>(
 
   const response = await fetch(`${API_URL}${path}`, {
     ...requestOptions,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...headers,
-      ...(token
-        ? { Authorization: `Bearer ${token}` }
-        : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 
@@ -31,6 +26,10 @@ export async function api<T>(
     throw new Error(
       error?.message ?? `Request failed: ${response.status}`,
     );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return response.json();

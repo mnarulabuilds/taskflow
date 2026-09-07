@@ -35,6 +35,10 @@ describe('AuthService', () => {
       service.login({ email: user.email, password: 'password123' }),
     ).resolves.toEqual({
       accessToken: 'signed-token',
+      user: {
+        id: user.id,
+        email: user.email,
+      },
     });
     expect(jwtService.signAsync).toHaveBeenCalledWith({
       sub: user.id,

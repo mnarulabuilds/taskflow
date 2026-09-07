@@ -1,15 +1,5 @@
-export function getAccessToken() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
+import { api } from '@/lib/api';
 
-  return localStorage.getItem('accessToken');
-}
-
-export function removeAccessToken() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.removeItem('accessToken');
+export async function logout() {
+  await api('/auth/logout', { method: 'POST' });
 }

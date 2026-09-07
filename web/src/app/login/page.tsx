@@ -5,45 +5,31 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { api } from '@/lib/api';
-
-interface LoginResponse {
-  accessToken: string;
-}
+import { AuthResponse } from '@/types/user';
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [error, setError] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setError('');
     setLoading(true);
 
     try {
-      const result = await api<LoginResponse>('/auth/login', {
+      await api<AuthResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        body: JSON.stringify({ email, password }),
       });
 
-      localStorage.setItem(
-        'accessToken',
-        result.accessToken,
-      );
-
       router.push('/dashboard');
-    } catch (error) {
+    } catch (submitError) {
       setError(
-        error instanceof Error
-          ? error.message
-          : 'Login failed',
+        submitError instanceof Error ? submitError.message : 'Login failed',
       );
     } finally {
       setLoading(false);
@@ -52,13 +38,8 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4"
-      >
-        <h1 className="text-2xl font-semibold">
-          Sign in to TaskFlow
-        </h1>
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
+        <h1 className="text-2xl font-semibold">Sign in to TaskFlow</h1>
 
         <input
           type="email"
@@ -78,11 +59,7 @@ export default function LoginPage() {
           required
         />
 
-        {error && (
-          <p className="text-sm text-red-600">
-            {error}
-          </p>
-        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
 
         <button
           type="submit"

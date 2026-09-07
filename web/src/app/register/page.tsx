@@ -5,10 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { api } from '@/lib/api';
-
-interface LoginResponse {
-  accessToken: string;
-}
+import { AuthResponse } from '@/types/user';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -34,7 +31,7 @@ export default function RegisterPage() {
         }),
       });
 
-      const result = await api<LoginResponse>('/auth/login', {
+      await api<AuthResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
           email: email.trim(),
@@ -42,7 +39,6 @@ export default function RegisterPage() {
         }),
       });
 
-      localStorage.setItem('accessToken', result.accessToken);
       router.push('/dashboard');
     } catch (submitError) {
       setError(
