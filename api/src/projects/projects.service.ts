@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -26,6 +30,32 @@ export class ProjectsService {
         createdBy: { select: { id: true, name: true, email: true } },
       },
     });
+  }
+
+  async findOne(projectId: string, currentUserId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        workspaceId: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            tasks: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found.');
+    }
+
+    await this.assertMembership(project.workspaceId, currentUserId);
+    return project;
   }
 
   async findAll(workspaceId: string, currentUserId: string) {

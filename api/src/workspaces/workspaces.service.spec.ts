@@ -23,6 +23,7 @@ describe('WorkspacesService', () => {
       create: jest.fn(),
     },
     user: { findUnique: jest.fn() },
+    workspace: { findMany: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -58,12 +59,36 @@ describe('WorkspacesService', () => {
     });
   });
 
-  it('lists memberships with workspace summary data', async () => {
-    prisma.workspaceMember.findMany.mockResolvedValue([]);
+  it('lists workspaces for a user with summary data', async () => {
+    prisma.workspace.findMany.mockResolvedValue([]);
     await expect(service.findAllForUser('user-1')).resolves.toEqual([]);
-    expect(prisma.workspaceMember.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: 'user-1' } }),
+    expect(prisma.workspace.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { members: { some: { userId: 'user-1' } } },
+      }),
     );
+  });
+
+  it('lists members for a workspace the user belongs to', async () => {
+    prisma.workspaceMember.findUnique.mockResolvedValue({
+      role: WorkspaceRole.MEMBER,
+    });
+    prisma.workspaceMember.findMany.mockResolvedValue([]);
+
+    await expect(service.findMembers('workspace-1', 'user-1')).resolves.toEqual(
+      [],
+    );
+    expect(prisma.workspaceMember.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { workspaceId: 'workspace-1' } }),
+    );
+  });
+
+  it('rejects member listing for users outside the workspace', async () => {
+    prisma.workspaceMember.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.findMembers('workspace-1', 'user-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it.each([

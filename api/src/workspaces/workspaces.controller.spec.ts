@@ -9,6 +9,7 @@ describe('WorkspacesController', () => {
   const service = {
     create: jest.fn(),
     findAllForUser: jest.fn(),
+    findMembers: jest.fn(),
     addMember: jest.fn(),
   };
   const user = { id: 'user-1', email: 'ada@example.com' };
@@ -34,6 +35,14 @@ describe('WorkspacesController', () => {
     service.findAllForUser.mockResolvedValue([]);
     await expect(controller.findAll(user)).resolves.toEqual([]);
     expect(service.findAllForUser).toHaveBeenCalledWith(user.id);
+  });
+
+  it('lists workspace members', async () => {
+    service.findMembers.mockResolvedValue([]);
+    await expect(controller.findMembers('workspace-1', user)).resolves.toEqual(
+      [],
+    );
+    expect(service.findMembers).toHaveBeenCalledWith('workspace-1', user.id);
   });
 
   it('forwards member invitations', async () => {

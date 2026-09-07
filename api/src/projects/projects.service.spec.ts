@@ -8,7 +8,7 @@ describe('ProjectsService', () => {
   let service: ProjectsService;
   const prisma = {
     workspaceMember: { findUnique: jest.fn() },
-    project: { findMany: jest.fn(), create: jest.fn() },
+    project: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -35,6 +35,19 @@ describe('ProjectsService', () => {
         data: { ...dto, workspaceId: 'workspace-1', createdById: 'user-1' },
       }),
     );
+  });
+
+  it('returns a project for a workspace member', async () => {
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      workspaceId: 'workspace-1',
+    });
+    prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
+
+    await expect(service.findOne('project-1', 'user-1')).resolves.toEqual({
+      id: 'project-1',
+      workspaceId: 'workspace-1',
+    });
   });
 
   it('lists projects for a workspace member', async () => {

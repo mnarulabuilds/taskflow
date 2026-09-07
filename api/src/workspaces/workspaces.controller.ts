@@ -22,6 +22,14 @@ export class WorkspacesController {
     return this.workspacesService.findAllForUser(user.id);
   }
 
+  @Get(':workspaceId/members')
+  findMembers(
+    @Param('workspaceId') workspaceId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.workspacesService.findMembers(workspaceId, user.id);
+  }
+
   @Post(':workspaceId/members')
   addMember(
     @Param('workspaceId') workspaceId: string,

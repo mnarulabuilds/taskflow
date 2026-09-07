@@ -33,6 +33,38 @@ export class WorkspacesService {
     });
   }
 
+  async findMembers(workspaceId: string, currentUserId: string) {
+    const currentMember = await this.prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: currentUserId,
+        },
+      },
+    });
+
+    if (!currentMember) {
+      throw new ForbiddenException('You are not a member of this workspace.');
+    }
+
+    return this.prisma.workspaceMember.findMany({
+      where: { workspaceId },
+      select: {
+        id: true,
+        role: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   findAllForUser(userId: string) {
     return this.prisma.workspace.findMany({
       where: {

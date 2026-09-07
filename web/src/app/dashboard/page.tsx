@@ -74,35 +74,6 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    async function loadUser() {
-      const token = getAccessToken();
-
-      if (!token) {
-        router.replace('/login');
-        return;
-      }
-
-      try {
-        const currentUser = await api<CurrentUser>(
-          '/auth/me',
-          {
-            token,
-          },
-        );
-
-        setUser(currentUser);
-      } catch {
-        removeAccessToken();
-        router.replace('/login');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadUser();
-  }, [router]);
-
-  useEffect(() => {
     async function loadDashboard() {
       const token = getAccessToken();
 
@@ -113,13 +84,8 @@ export default function DashboardPage() {
 
       try {
         const [currentUser, workspaceData] = await Promise.all([
-          api<CurrentUser>('/auth/me', {
-            token,
-          }),
-
-          api<Workspace[]>('/workspaces', {
-            token,
-          }),
+          api<CurrentUser>('/auth/me', { token }),
+          api<Workspace[]>('/workspaces', { token }),
         ]);
 
         setUser(currentUser);
@@ -131,8 +97,9 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
+
     loadDashboard();
-  }, []);
+  }, [router]);
 
   if (loading) {
     return (

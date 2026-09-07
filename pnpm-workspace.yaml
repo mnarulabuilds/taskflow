@@ -1,6 +1,11 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - "api"
+  - "web"
 allowBuilds:
+  '@parcel/watcher': false
+  '@prisma/client': false
+  '@prisma/engines': false
+  bcrypt: false
+  prisma: false
   sharp: true
   unrs-resolver: true
