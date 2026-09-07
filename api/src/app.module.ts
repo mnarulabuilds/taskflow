@@ -11,6 +11,9 @@ import { ProjectsModule } from './projects/projects.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TasksModule } from './tasks/tasks.module';
+import { CommentsModule } from './comments/comments.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { CommonModule } from './common/common.module';
 import { envValidationSchema } from './config/env.validation';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
@@ -27,12 +30,15 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
         limit: 100,
       },
     ]),
+    CommonModule,
     PrismaModule,
     UsersModule,
     AuthModule,
     WorkspacesModule,
     ProjectsModule,
     TasksModule,
+    CommentsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

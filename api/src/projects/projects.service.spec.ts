@@ -2,13 +2,20 @@ import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ActivityService } from '../common/activity.service';
 import { ProjectsService } from './projects.service';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
   const prisma = {
     workspaceMember: { findUnique: jest.fn() },
-    project: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
+    project: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -17,6 +24,7 @@ describe('ProjectsService', () => {
       providers: [
         ProjectsService,
         { provide: PrismaService, useValue: prisma },
+        { provide: ActivityService, useValue: { log: jest.fn() } },
       ],
     }).compile();
     service = module.get<ProjectsService>(ProjectsService);
@@ -44,10 +52,12 @@ describe('ProjectsService', () => {
     });
     prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
 
-    await expect(service.findOne('project-1', 'user-1')).resolves.toEqual({
-      id: 'project-1',
-      workspaceId: 'workspace-1',
-    });
+    await expect(service.findOne('project-1', 'user-1')).resolves.toEqual(
+      expect.objectContaining({
+        id: 'project-1',
+        workspaceId: 'workspace-1',
+      }),
+    );
   });
 
   it('lists projects for a workspace member', async () => {

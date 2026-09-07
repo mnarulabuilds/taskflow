@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { WorkspacesController } from './workspaces.controller';
 import { WorkspacesService } from './workspaces.service';
+import { ActivityService } from '../common/activity.service';
 
 describe('WorkspacesController', () => {
   let controller: WorkspacesController;
@@ -18,7 +19,10 @@ describe('WorkspacesController', () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WorkspacesController],
-      providers: [{ provide: WorkspacesService, useValue: service }],
+      providers: [
+        { provide: WorkspacesService, useValue: service },
+        { provide: ActivityService, useValue: { findForWorkspace: jest.fn() } },
+      ],
     }).compile();
     controller = module.get<WorkspacesController>(WorkspacesController);
   });

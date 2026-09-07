@@ -7,6 +7,8 @@ import { WorkspaceRole } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ActivityService } from '../common/activity.service';
+import { InvitesService } from '../notifications/invites.service';
 import { WorkspacesService } from './workspaces.service';
 
 describe('WorkspacesService', () => {
@@ -23,7 +25,12 @@ describe('WorkspacesService', () => {
       create: jest.fn(),
     },
     user: { findUnique: jest.fn() },
-    workspace: { findMany: jest.fn() },
+    workspace: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    workspaceInvite: { findUnique: jest.fn() },
+  };
+  const activityService = { log: jest.fn().mockResolvedValue({}) };
+  const invitesService = {
+    createInvite: jest.fn().mockResolvedValue({ token: 'invite-token' }),
   };
 
   beforeEach(async () => {
@@ -36,6 +43,8 @@ describe('WorkspacesService', () => {
       providers: [
         WorkspacesService,
         { provide: PrismaService, useValue: prisma },
+        { provide: ActivityService, useValue: activityService },
+        { provide: InvitesService, useValue: invitesService },
       ],
     }).compile();
     service = module.get<WorkspacesService>(WorkspacesService);
@@ -111,17 +120,23 @@ describe('WorkspacesService', () => {
     },
   );
 
-  it('rejects an invitation when the email has no registered user', async () => {
+  it('sends an email invite when the user is not registered', async () => {
     prisma.workspaceMember.findUnique.mockResolvedValue({
       role: WorkspaceRole.OWNER,
     });
     prisma.user.findUnique.mockResolvedValue(null);
+    prisma.workspaceInvite.findUnique.mockResolvedValue(null);
+
     await expect(
       service.addMember('workspace-1', 'user-1', {
         email: 'missing@example.com',
         role: WorkspaceRole.MEMBER,
       }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).resolves.toEqual({
+      inviteSent: true,
+      email: 'missing@example.com',
+    });
+    expect(invitesService.createInvite).toHaveBeenCalled();
   });
 
   it('rejects invitations for users already in the workspace', async () => {

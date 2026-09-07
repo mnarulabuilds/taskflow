@@ -4,48 +4,119 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  ActivityType,
+  WorkspaceMember,
+  WorkspaceRole,
+} from '@prisma/client';
+
+import { ActivityService } from '../common/activity.service';
+import { InvitesService } from '../notifications/invites.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddMemberDto } from './dto/add-member.dto';
-import { WorkspaceMember, WorkspaceRole } from '@prisma/client';
 
 @Injectable()
 export class WorkspacesService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+    private readonly invitesService: InvitesService,
+  ) {}
 
-  create(ownerId: string, name: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const workspace = await tx.workspace.create({
-        data: {
-          name,
-          ownerId,
-        },
+  async create(ownerId: string, name: string) {
+    const workspace = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.workspace.create({
+        data: { name, ownerId },
       });
 
       await tx.workspaceMember.create({
         data: {
-          workspaceId: workspace.id,
+          workspaceId: created.id,
           userId: ownerId,
-          role: 'OWNER',
+          role: WorkspaceRole.OWNER,
         },
       });
 
-      return workspace;
+      return created;
     });
+
+    await this.activityService.log({
+      type: ActivityType.WORKSPACE_CREATED,
+      workspaceId: workspace.id,
+      userId: ownerId,
+      metadata: { name },
+    });
+
+    return workspace;
   }
 
-  async findMembers(workspaceId: string, currentUserId: string) {
-    const currentMember = await this.prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId,
-          userId: currentUserId,
+  async findOne(workspaceId: string, currentUserId: string) {
+    await this.assertMembership(workspaceId, currentUserId);
+
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: { projects: true, members: true },
         },
       },
     });
 
-    if (!currentMember) {
-      throw new ForbiddenException('You are not a member of this workspace.');
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found.');
     }
+
+    return workspace;
+  }
+
+  async update(workspaceId: string, currentUserId: string, name: string) {
+    const member = await this.assertAdmin(workspaceId, currentUserId);
+
+    if (member.role === WorkspaceRole.MEMBER) {
+      throw new ForbiddenException('You do not have permission to edit this workspace.');
+    }
+
+    const workspace = await this.prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { name },
+    });
+
+    await this.activityService.log({
+      type: ActivityType.WORKSPACE_UPDATED,
+      workspaceId,
+      userId: currentUserId,
+      metadata: { name },
+    });
+
+    return workspace;
+  }
+
+  async remove(workspaceId: string, currentUserId: string) {
+    const member = await this.assertAdmin(workspaceId, currentUserId);
+
+    if (member.role !== WorkspaceRole.OWNER) {
+      throw new ForbiddenException('Only the workspace owner can delete it.');
+    }
+
+    await this.activityService.log({
+      type: ActivityType.WORKSPACE_DELETED,
+      workspaceId,
+      userId: currentUserId,
+      metadata: {},
+    });
+
+    await this.prisma.workspace.delete({ where: { id: workspaceId } });
+
+    return { success: true };
+  }
+
+  async findMembers(workspaceId: string, currentUserId: string) {
+    await this.assertMembership(workspaceId, currentUserId);
 
     return this.prisma.workspaceMember.findMany({
       where: { workspaceId },
@@ -54,11 +125,7 @@ export class WorkspacesService {
         role: true,
         createdAt: true,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -67,28 +134,17 @@ export class WorkspacesService {
 
   findAllForUser(userId: string) {
     return this.prisma.workspace.findMany({
-      where: {
-        members: {
-          some: {
-            userId,
-          },
-        },
-      },
+      where: { members: { some: { userId } } },
       select: {
         id: true,
         name: true,
         ownerId: true,
         createdAt: true,
         _count: {
-          select: {
-            projects: true,
-            members: true,
-          },
+          select: { projects: true, members: true },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -96,22 +152,9 @@ export class WorkspacesService {
     workspaceId: string,
     currentUserId: string,
     dto: AddMemberDto,
-  ): Promise<WorkspaceMember> {
-    // 1. Verify current user is a member of the workspace
-    const currentMember = await this.prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId,
-          userId: currentUserId,
-        },
-      },
-    });
+  ): Promise<WorkspaceMember | { inviteSent: true; email: string }> {
+    const currentMember = await this.assertAdmin(workspaceId, currentUserId);
 
-    if (!currentMember) {
-      throw new ForbiddenException('You are not a member of this workspace.');
-    }
-
-    // 2. Check permissions
     if (currentMember.role === WorkspaceRole.MEMBER) {
       throw new ForbiddenException(
         'You do not have permission to invite members.',
@@ -128,18 +171,32 @@ export class WorkspacesService {
       );
     }
 
-    // 3. Find the invited user
+    const email = dto.email.toLowerCase();
     const invitedUser = await this.prisma.user.findUnique({
-      where: {
-        email: dto.email,
-      },
+      where: { email },
     });
 
     if (!invitedUser) {
-      throw new NotFoundException('User not found.');
+      const existingInvite = await this.prisma.workspaceInvite.findUnique({
+        where: {
+          workspaceId_email: { workspaceId, email },
+        },
+      });
+
+      if (existingInvite?.status === 'PENDING') {
+        throw new ConflictException('An invite is already pending for this email.');
+      }
+
+      await this.invitesService.createInvite(
+        workspaceId,
+        currentUserId,
+        email,
+        dto.role,
+      );
+
+      return { inviteSent: true, email };
     }
 
-    // 4. Check if already a member
     const existingMember = await this.prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: {
@@ -155,22 +212,42 @@ export class WorkspacesService {
       );
     }
 
-    // 5. Create membership
-    return this.prisma.workspaceMember.create({
+    const membership = await this.prisma.workspaceMember.create({
       data: {
         workspaceId,
         userId: invitedUser.id,
         role: dto.role,
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        user: { select: { id: true, name: true, email: true } },
       },
     });
+
+    await this.activityService.log({
+      type: ActivityType.MEMBER_JOINED,
+      workspaceId,
+      userId: currentUserId,
+      metadata: { email, role: dto.role },
+    });
+
+    return membership;
+  }
+
+  private async assertMembership(workspaceId: string, userId: string) {
+    const membership = await this.prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: { workspaceId, userId },
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this workspace.');
+    }
+
+    return membership;
+  }
+
+  private async assertAdmin(workspaceId: string, userId: string) {
+    return this.assertMembership(workspaceId, userId);
   }
 }

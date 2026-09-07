@@ -132,10 +132,16 @@ Use a managed PostgreSQL service (RDS, Supabase, Neon) in production.
 | POST | `/auth/logout` | Logout (clears cookie) |
 | GET | `/auth/me` | Current user |
 | GET/POST | `/workspaces` | List / create workspaces |
+| GET/PATCH/DELETE | `/workspaces/:id` | Workspace details / update / delete |
 | GET/POST | `/workspaces/:id/members` | List / invite members |
-| GET/POST | `/workspaces/:id/projects` | List / create projects |
-| GET | `/projects/:id` | Project details |
-| CRUD | `/projects/:id/tasks` | Task management |
+| GET | `/workspaces/:id/activity` | Workspace activity feed |
+| GET/PATCH/DELETE | `/projects/:id` | Project details / update / delete |
+| GET | `/projects/:id/activity` | Project activity feed |
+| CRUD | `/projects/:id/tasks` | Task management (supports `?search&status&priority&assigneeId`) |
+| GET/POST | `/projects/:id/tasks/:taskId/comments` | Task comments |
+| GET/PATCH | `/notifications` | List / mark read |
+| GET | `/invites/pending` | Pending workspace invites |
+| POST | `/invites/:token/accept` | Accept invite |
 | GET | `/health` | Health check |
 | GET | `/docs` | Swagger API documentation |
 

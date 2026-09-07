@@ -2,6 +2,8 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ActivityService } from '../common/activity.service';
+import { NotificationsService } from '../common/notifications.service';
 import { TasksService } from './tasks.service';
 
 describe('TasksService', () => {
@@ -29,7 +31,12 @@ describe('TasksService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TasksService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        TasksService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ActivityService, useValue: { log: jest.fn() } },
+        { provide: NotificationsService, useValue: { create: jest.fn() } },
+      ],
     }).compile();
     service = module.get<TasksService>(TasksService);
   });
@@ -63,7 +70,7 @@ describe('TasksService', () => {
   it('lists tasks only after checking project membership', async () => {
     allowProjectAccess();
     prisma.task.findMany.mockResolvedValue([]);
-    await expect(service.findAll('project-1', 'user-1')).resolves.toEqual([]);
+    await expect(service.findAll('project-1', 'user-1', {})).resolves.toEqual([]);
     expect(prisma.task.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { projectId: 'project-1' } }),
     );
@@ -107,7 +114,7 @@ describe('TasksService', () => {
 
   it('updates a task within the requested project and supports unassigning it', async () => {
     allowProjectAccess();
-    prisma.task.findFirst.mockResolvedValue({ id: 'task-1' });
+    prisma.task.findFirst.mockResolvedValue({ id: 'task-1', status: 'TODO', title: 'Task', assigneeId: null });
     prisma.task.update.mockResolvedValue({ id: 'task-1', assigneeId: null });
     await expect(
       service.update('project-1', 'task-1', 'user-1', {
@@ -124,7 +131,7 @@ describe('TasksService', () => {
 
   it('converts an updated due date into a Date', async () => {
     allowProjectAccess();
-    prisma.task.findFirst.mockResolvedValue({ id: 'task-1' });
+    prisma.task.findFirst.mockResolvedValue({ id: 'task-1', status: 'TODO', title: 'Task', assigneeId: null });
     prisma.task.update.mockResolvedValue({ id: 'task-1' });
     const dueDate = '2026-08-15T00:00:00.000Z';
 
@@ -152,7 +159,7 @@ describe('TasksService', () => {
 
   it('deletes a task after confirming project access and ownership', async () => {
     allowProjectAccess();
-    prisma.task.findFirst.mockResolvedValue({ id: 'task-1' });
+    prisma.task.findFirst.mockResolvedValue({ id: 'task-1', status: 'TODO', title: 'Task', assigneeId: null });
     await service.remove('project-1', 'task-1', 'user-1');
     expect(prisma.task.delete).toHaveBeenCalledWith({
       where: { id: 'task-1' },

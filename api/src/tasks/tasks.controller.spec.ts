@@ -31,9 +31,9 @@ describe('TasksController', () => {
     ],
     [
       'find all',
-      () => controller.findAll('project-1', user),
+      () => controller.findAll('project-1', user, {}),
       'findAll',
-      ['project-1', user.id],
+      ['project-1', user.id, {}],
     ],
     [
       'update',

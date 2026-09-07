@@ -1,9 +1,10 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 import { Modal } from '@/components/modal';
 import { api } from '@/lib/api';
+import { TaskComment } from '@/types/comment';
 import { Task, TaskPriority, TaskStatus } from '@/types/task';
 import { WorkspaceMember } from '@/types/member';
 
@@ -32,10 +33,21 @@ export function TaskDetailModal({
     task.dueDate ? task.dueDate.slice(0, 10) : '',
   );
   const [assigneeId, setAssigneeId] = useState(task.assignee?.id ?? '');
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [commentText, setCommentText] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [postingComment, setPostingComment] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api<TaskComment[]>(
+      `/projects/${projectId}/tasks/${task.id}/comments`,
+    )
+      .then(setComments)
+      .catch(() => undefined);
+  }, [projectId, task.id]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -84,7 +96,6 @@ export function TaskDetailModal({
       await api(`/projects/${projectId}/tasks/${task.id}`, {
         method: 'DELETE',
       });
-
       onDeleted(task.id);
       onClose();
     } catch (deleteError) {
@@ -96,6 +107,34 @@ export function TaskDetailModal({
     } finally {
       setDeleting(false);
       setConfirmDelete(false);
+    }
+  }
+
+  async function handleAddComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!commentText.trim()) {
+      return;
+    }
+
+    setPostingComment(true);
+    try {
+      const comment = await api<TaskComment>(
+        `/projects/${projectId}/tasks/${task.id}/comments`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: commentText.trim() }),
+        },
+      );
+      setComments((current) => [...current, comment]);
+      setCommentText('');
+    } catch (commentError) {
+      setError(
+        commentError instanceof Error
+          ? commentError.message
+          : 'Unable to add comment',
+      );
+    } finally {
+      setPostingComment(false);
     }
   }
 
@@ -138,7 +177,6 @@ export function TaskDetailModal({
               <option value="DONE">Done</option>
             </select>
           </div>
-
           <div>
             <label className="mb-1 block text-sm font-medium">Priority</label>
             <select
@@ -165,7 +203,6 @@ export function TaskDetailModal({
               className="w-full rounded border p-2"
             />
           </div>
-
           <div>
             <label className="mb-1 block text-sm font-medium">Assignee</label>
             <select
@@ -176,12 +213,45 @@ export function TaskDetailModal({
               <option value="">Unassigned</option>
               {members.map((member) => (
                 <option key={member.user.id} value={member.user.id}>
-                  {member.user.name} ({member.user.email})
+                  {member.user.name}
                 </option>
               ))}
             </select>
           </div>
         </div>
+
+        <section className="rounded border p-3">
+          <h3 className="text-sm font-medium">Comments</h3>
+          <div className="mt-3 max-h-40 space-y-3 overflow-y-auto">
+            {comments.length === 0 && (
+              <p className="text-sm text-gray-500">No comments yet.</p>
+            )}
+            {comments.map((comment) => (
+              <article key={comment.id} className="text-sm">
+                <p className="font-medium">{comment.author.name}</p>
+                <p className="text-gray-700">{comment.content}</p>
+                <p className="text-xs text-gray-400">
+                  {new Date(comment.createdAt).toLocaleString()}
+                </p>
+              </article>
+            ))}
+          </div>
+          <form onSubmit={handleAddComment} className="mt-3 flex gap-2">
+            <input
+              value={commentText}
+              onChange={(event) => setCommentText(event.target.value)}
+              placeholder="Add a comment..."
+              className="flex-1 rounded border p-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={postingComment}
+              className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+            >
+              Post
+            </button>
+          </form>
+        </section>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -202,7 +272,6 @@ export function TaskDetailModal({
                 ? 'Confirm delete'
                 : 'Delete task'}
           </button>
-
           <div className="flex gap-2">
             <button
               type="button"

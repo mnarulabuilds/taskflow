@@ -18,6 +18,10 @@ export interface ProjectDetail {
   workspaceId: string;
   createdAt: string;
   updatedAt: string;
+  workspace?: {
+    id: string;
+    name: string;
+  };
   _count: {
     tasks: number;
   };
