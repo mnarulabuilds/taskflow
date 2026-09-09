@@ -32,12 +32,46 @@
   --radius: 0.625rem;
 
   /* Kanban columns */
+  --column-backlog: #f1f5f9;
+  --column-backlog-accent: #64748b;
   --column-todo: #e0e7ff;
   --column-todo-accent: #6366f1;
   --column-progress: #fef3c7;
   --column-progress-accent: #f59e0b;
+  --column-review: #ede9fe;
+  --column-review-accent: #7c3aed;
+  --column-blocked: #ffe4e6;
+  --column-blocked-accent: #e11d48;
   --column-done: #d1fae5;
   --column-done-accent: #059669;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #0f0a1e;
+  --foreground: #ede9fe;
+  --surface: #1a1333;
+  --surface-muted: #2e1065;
+  --border: #5b21b6;
+  --primary: #818cf8;
+  --primary-hover: #a5b4fc;
+  --primary-foreground: #1e1b4b;
+  --muted: #a78bfa;
+  --muted-foreground: #c4b5fd;
+  --ring: #a5b4fc;
+  --column-backlog: #1e293b;
+  --column-backlog-accent: #94a3b8;
+  --column-todo: #1e1b4b;
+  --column-progress: #451a03;
+  --column-review: #2e1065;
+  --column-review-accent: #a78bfa;
+  --column-blocked: #4c0519;
+  --column-blocked-accent: #fb7185;
+  --column-done: #064e3b;
 }
 
 @theme inline {
@@ -62,10 +96,16 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-ring: var(--ring);
+  --color-column-backlog: var(--column-backlog);
+  --color-column-backlog-accent: var(--column-backlog-accent);
   --color-column-todo: var(--column-todo);
   --color-column-todo-accent: var(--column-todo-accent);
   --color-column-progress: var(--column-progress);
   --color-column-progress-accent: var(--column-progress-accent);
+  --color-column-review: var(--column-review);
+  --color-column-review-accent: var(--column-review-accent);
+  --color-column-blocked: var(--column-blocked);
+  --color-column-blocked-accent: var(--column-blocked-accent);
   --color-column-done: var(--column-done);
   --color-column-done-accent: var(--column-done-accent);
   --font-sans: var(--font-geist-sans);
@@ -74,7 +114,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --background: #0f0a1e;
     --foreground: #ede9fe;
     --surface: #1a1333;
@@ -86,8 +126,14 @@
     --muted: #a78bfa;
     --muted-foreground: #c4b5fd;
     --ring: #a5b4fc;
+    --column-backlog: #1e293b;
+    --column-backlog-accent: #94a3b8;
     --column-todo: #1e1b4b;
     --column-progress: #451a03;
+    --column-review: #2e1065;
+    --column-review-accent: #a78bfa;
+    --column-blocked: #4c0519;
+    --column-blocked-accent: #fb7185;
     --column-done: #064e3b;
   }
 }

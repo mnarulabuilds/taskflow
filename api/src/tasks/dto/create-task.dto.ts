@@ -1,5 +1,6 @@
 import { TaskPriority, TaskStatus } from '@prisma/client';
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsOptional,
@@ -34,4 +35,9 @@ export class CreateTaskDto {
   @IsOptional()
   @IsString()
   assigneeId?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  labelIds?: string[];
 }

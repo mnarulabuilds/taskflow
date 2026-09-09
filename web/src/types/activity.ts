@@ -12,7 +12,9 @@ export type ActivityType =
   | 'TASK_DELETED'
   | 'COMMENT_ADDED'
   | 'MEMBER_INVITED'
-  | 'MEMBER_JOINED';
+  | 'MEMBER_JOINED'
+  | 'MEMBER_REMOVED'
+  | 'MEMBER_ROLE_CHANGED';
 
 export interface Activity {
   id: string;

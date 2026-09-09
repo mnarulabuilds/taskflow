@@ -107,6 +107,33 @@ export class InvitesService {
     return membership;
   }
 
+  async decline(token: string, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const invite = await this.prisma.workspaceInvite.findUnique({
+      where: { token },
+    });
+
+    if (!invite || invite.status !== 'PENDING') {
+      throw new NotFoundException('Invite not found or already used.');
+    }
+
+    if (invite.email.toLowerCase() !== user.email.toLowerCase()) {
+      throw new ForbiddenException('This invite is for a different email.');
+    }
+
+    await this.prisma.workspaceInvite.update({
+      where: { id: invite.id },
+      data: { status: 'DECLINED' },
+    });
+
+    return { success: true };
+  }
+
   async createInvite(
     workspaceId: string,
     invitedById: string,

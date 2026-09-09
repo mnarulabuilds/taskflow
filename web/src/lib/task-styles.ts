@@ -3,8 +3,11 @@ import { TaskPriority, TaskStatus } from '@/types/task';
 import { cn } from './cn';
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {
+  BACKLOG: 'Backlog',
   TODO: 'To do',
   IN_PROGRESS: 'In progress',
+  REVIEW: 'Review',
+  BLOCKED: 'Blocked',
   DONE: 'Done',
 };
 
@@ -16,10 +19,16 @@ export const PRIORITY_LABELS: Record<TaskPriority, string> = {
 
 export function statusBadgeClass(status: TaskStatus) {
   switch (status) {
+    case 'BACKLOG':
+      return 'bg-slate-100 text-slate-900 border-slate-200';
     case 'TODO':
       return 'bg-indigo-100 text-indigo-900 border-indigo-200';
     case 'IN_PROGRESS':
       return 'bg-amber-100 text-amber-900 border-amber-200';
+    case 'REVIEW':
+      return 'bg-violet-100 text-violet-900 border-violet-200';
+    case 'BLOCKED':
+      return 'bg-rose-100 text-rose-900 border-rose-200';
     case 'DONE':
       return 'bg-emerald-100 text-emerald-900 border-emerald-200';
   }
@@ -37,8 +46,15 @@ export function priorityBadgeClass(priority: TaskPriority) {
 }
 
 export function columnClass(status: TaskStatus, isOver = false) {
-  const base = 'min-h-96 rounded-xl p-4 transition-colors border-2';
+  const base =
+    'min-h-96 min-w-72 shrink-0 rounded-xl p-4 transition-colors border-2';
   switch (status) {
+    case 'BACKLOG':
+      return cn(
+        base,
+        'bg-column-backlog border-column-backlog-accent/30',
+        isOver && 'border-column-backlog-accent bg-column-backlog/80',
+      );
     case 'TODO':
       return cn(
         base,
@@ -51,6 +67,18 @@ export function columnClass(status: TaskStatus, isOver = false) {
         'bg-column-progress border-column-progress-accent/30',
         isOver && 'border-column-progress-accent bg-column-progress/80',
       );
+    case 'REVIEW':
+      return cn(
+        base,
+        'bg-column-review border-column-review-accent/30',
+        isOver && 'border-column-review-accent bg-column-review/80',
+      );
+    case 'BLOCKED':
+      return cn(
+        base,
+        'bg-column-blocked border-column-blocked-accent/30',
+        isOver && 'border-column-blocked-accent bg-column-blocked/80',
+      );
     case 'DONE':
       return cn(
         base,
@@ -62,10 +90,16 @@ export function columnClass(status: TaskStatus, isOver = false) {
 
 export function columnAccentClass(status: TaskStatus) {
   switch (status) {
+    case 'BACKLOG':
+      return 'text-column-backlog-accent';
     case 'TODO':
       return 'text-column-todo-accent';
     case 'IN_PROGRESS':
       return 'text-column-progress-accent';
+    case 'REVIEW':
+      return 'text-column-review-accent';
+    case 'BLOCKED':
+      return 'text-column-blocked-accent';
     case 'DONE':
       return 'text-column-done-accent';
   }

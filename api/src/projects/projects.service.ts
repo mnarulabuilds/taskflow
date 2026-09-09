@@ -7,6 +7,7 @@ import { ActivityType } from '@prisma/client';
 
 import { ActivityService } from '../common/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
@@ -15,6 +16,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
+    private readonly workspacesService: WorkspacesService,
   ) {}
 
   async create(
@@ -22,7 +24,7 @@ export class ProjectsService {
     currentUserId: string,
     dto: CreateProjectDto,
   ) {
-    await this.assertMembership(workspaceId, currentUserId);
+    await this.workspacesService.assertMembership(workspaceId, currentUserId);
 
     const project = await this.prisma.project.create({
       data: {
@@ -67,12 +69,15 @@ export class ProjectsService {
       throw new NotFoundException('Project not found.');
     }
 
-    await this.assertMembership(project.workspaceId, currentUserId);
+    await this.workspacesService.assertMembership(
+      project.workspaceId,
+      currentUserId,
+    );
     return project;
   }
 
   async findAll(workspaceId: string, currentUserId: string) {
-    await this.assertMembership(workspaceId, currentUserId);
+    await this.workspacesService.assertMembership(workspaceId, currentUserId);
 
     return this.prisma.project.findMany({
       where: { workspaceId },
@@ -96,6 +101,10 @@ export class ProjectsService {
     dto: UpdateProjectDto,
   ) {
     const project = await this.findOne(projectId, currentUserId);
+    await this.workspacesService.assertCanEditProject(
+      project.workspaceId,
+      currentUserId,
+    );
 
     const updated = await this.prisma.project.update({
       where: { id: projectId },
@@ -124,6 +133,10 @@ export class ProjectsService {
 
   async remove(projectId: string, currentUserId: string) {
     const project = await this.findOne(projectId, currentUserId);
+    await this.workspacesService.assertCanEditProject(
+      project.workspaceId,
+      currentUserId,
+    );
 
     await this.activityService.log({
       type: ActivityType.PROJECT_DELETED,
@@ -136,17 +149,5 @@ export class ProjectsService {
     await this.prisma.project.delete({ where: { id: projectId } });
 
     return { success: true };
-  }
-
-  private async assertMembership(workspaceId: string, userId: string) {
-    const membership = await this.prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: { workspaceId, userId },
-      },
-    });
-
-    if (!membership) {
-      throw new ForbiddenException('You are not a member of this workspace.');
-    }
   }
 }

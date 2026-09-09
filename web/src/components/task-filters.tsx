@@ -1,11 +1,12 @@
 'use client';
 
-import { TaskPriority, TaskStatus } from '@/types/task';
+import { ALL_STATUSES, TaskPriority, TaskStatus } from '@/types/task';
 import { WorkspaceMember } from '@/types/member';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { STATUS_LABELS } from '@/lib/task-styles';
 
 export interface TaskFiltersState {
   search: string;
@@ -33,6 +34,7 @@ export function TaskFilters({ filters, members, onChange }: TaskFiltersProps) {
         </Label>
         <Input
           id="task-search"
+          data-search-input="true"
           type="search"
           placeholder="Search tasks..."
           value={filters.search}
@@ -57,9 +59,11 @@ export function TaskFilters({ filters, members, onChange }: TaskFiltersProps) {
           }
         >
           <option value="">All statuses</option>
-          <option value="TODO">To do</option>
-          <option value="IN_PROGRESS">In progress</option>
-          <option value="DONE">Done</option>
+          {ALL_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {STATUS_LABELS[status]}
+            </option>
+          ))}
         </Select>
       </div>
 

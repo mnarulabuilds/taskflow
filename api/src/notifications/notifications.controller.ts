@@ -56,4 +56,9 @@ export class InvitesController {
   accept(@Param('token') token: string, @CurrentUser() user: AuthUser) {
     return this.invitesService.accept(token, user.id);
   }
+
+  @Post(':token/decline')
+  decline(@Param('token') token: string, @CurrentUser() user: AuthUser) {
+    return this.invitesService.decline(token, user.id);
+  }
 }

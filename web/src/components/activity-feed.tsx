@@ -1,6 +1,12 @@
+'use client';
+
+import { useState } from 'react';
+
 import { Activity, ActivityType } from '@/types/activity';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 const LABELS: Record<ActivityType, string> = {
   WORKSPACE_CREATED: 'created the workspace',
@@ -17,6 +23,8 @@ const LABELS: Record<ActivityType, string> = {
   COMMENT_ADDED: 'commented on',
   MEMBER_INVITED: 'invited',
   MEMBER_JOINED: 'joined the workspace',
+  MEMBER_REMOVED: 'removed a member',
+  MEMBER_ROLE_CHANGED: 'changed a member role',
 };
 
 function activityDetail(activity: Activity) {
@@ -44,40 +52,59 @@ function activityDetail(activity: Activity) {
 interface ActivityFeedProps {
   activities: Activity[];
   title?: string;
+  collapsible?: boolean;
 }
 
 export function ActivityFeed({
   activities,
   title = 'Recent activity',
+  collapsible = false,
 }: ActivityFeedProps) {
+  const [expanded, setExpanded] = useState(!collapsible);
+
   return (
     <Card aria-labelledby="activity-feed-title">
-      <CardTitle id="activity-feed-title" className="text-lg">
-        {title}
-      </CardTitle>
+      <div className="flex items-center justify-between gap-2">
+        <CardTitle id="activity-feed-title" className="text-lg">
+          {title}
+        </CardTitle>
+        {collapsible && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="lg:hidden"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+          >
+            {expanded ? 'Hide' : 'Show'}
+          </Button>
+        )}
+      </div>
 
-      {activities.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">No activity yet.</p>
-      ) : (
-        <ul className="mt-4 space-y-3" aria-live="polite">
-          {activities.map((activity) => (
-            <li
-              key={activity.id}
-              className="rounded-lg border border-border bg-surface-muted/40 p-3 text-sm"
-            >
-              <span className="font-semibold text-primary">{activity.user.name}</span>{' '}
-              <span className="text-muted">
-                {LABELS[activity.type]} {activityDetail(activity)}
-              </span>
-              <p className="mt-1 text-xs text-muted">
-                <time dateTime={activity.createdAt}>
-                  {new Date(activity.createdAt).toLocaleString()}
-                </time>
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className={cn(collapsible && !expanded && 'hidden lg:block')}>
+        {activities.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">No activity yet.</p>
+        ) : (
+          <ul className="mt-4 space-y-3" aria-live="polite">
+            {activities.map((activity) => (
+              <li
+                key={activity.id}
+                className="rounded-lg border border-border bg-surface-muted/40 p-3 text-sm"
+              >
+                <span className="font-semibold text-primary">{activity.user.name}</span>{' '}
+                <span className="text-muted">
+                  {LABELS[activity.type]} {activityDetail(activity)}
+                </span>
+                <p className="mt-1 text-xs text-muted">
+                  <time dateTime={activity.createdAt}>
+                    {new Date(activity.createdAt).toLocaleString()}
+                  </time>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </Card>
   );
 }

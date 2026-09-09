@@ -3,8 +3,15 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
 
+import {
+  CommandPalette,
+  CommandPaletteTrigger,
+  useCommandPalette,
+} from '@/components/command-palette';
 import { NotificationBell } from '@/components/notification-bell';
+import { SidebarNav } from '@/components/sidebar-nav';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/providers/theme-provider';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -15,6 +22,7 @@ interface AppShellProps {
 
 export function AppShell({ breadcrumbs = [], children }: AppShellProps) {
   const { user, logout } = useAuth();
+  const commandPalette = useCommandPalette();
 
   return (
     <div className="min-h-screen bg-background">
@@ -80,10 +88,18 @@ export function AppShell({ breadcrumbs = [], children }: AppShellProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <CommandPaletteTrigger onClick={() => commandPalette.setOpen(true)} />
+            <ThemeToggle className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm" />
             <NotificationBell />
+            <Link
+              href="/settings"
+              className="hidden rounded-lg px-2 py-1.5 text-sm text-muted hover:bg-surface-muted hover:text-foreground sm:inline"
+            >
+              Profile
+            </Link>
             {user?.email && (
-              <span className="hidden text-sm text-muted sm:inline">
+              <span className="hidden text-sm text-muted md:inline">
                 {user.email}
               </span>
             )}
@@ -94,12 +110,23 @@ export function AppShell({ breadcrumbs = [], children }: AppShellProps) {
         </div>
       </header>
 
-      <main
-        id="main-content"
-        className={cn('mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8')}
-      >
-        {children}
-      </main>
+      <div className="mx-auto flex max-w-7xl gap-8 px-4 md:px-6">
+        <aside className="w-full shrink-0 border-border py-6 lg:w-52 lg:border-r lg:pr-6">
+          <SidebarNav />
+        </aside>
+
+        <main
+          id="main-content"
+          className={cn('min-w-0 flex-1 py-6 md:py-8')}
+        >
+          {children}
+        </main>
+      </div>
+
+      <CommandPalette
+        open={commandPalette.open}
+        onClose={commandPalette.close}
+      />
     </div>
   );
 }

@@ -42,7 +42,11 @@ describe('UsersService', () => {
       createdAt,
     });
     expect(prisma.user.create).toHaveBeenCalledWith({
-      data: { ...dto, password: 'hashed-password' },
+      data: {
+        ...dto,
+        password: 'hashed-password',
+        preferences: { create: {} },
+      },
     });
   });
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { PrismaModule } from './prisma/prisma.module';
@@ -14,6 +15,8 @@ import { TasksModule } from './tasks/tasks.module';
 import { CommentsModule } from './comments/comments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CommonModule } from './common/common.module';
+import { EventsModule } from './events/events.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 import { envValidationSchema } from './config/env.validation';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
@@ -24,6 +27,7 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
       isGlobal: true,
       validationSchema: envValidationSchema,
     }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,
@@ -39,6 +43,8 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
     TasksModule,
     CommentsModule,
     NotificationsModule,
+    EventsModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,0 +1,21 @@
+{
+  "name": "TaskFlow",
+  "short_name": "TaskFlow",
+  "description": "Manage tasks across workspaces and projects",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f5f3ff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { WorkspacesController } from './workspaces.controller';
 import { WorkspacesService } from './workspaces.service';
+import { LabelsService } from './labels.service';
 import { ActivityService } from '../common/activity.service';
 
 describe('WorkspacesController', () => {
@@ -21,6 +22,7 @@ describe('WorkspacesController', () => {
       controllers: [WorkspacesController],
       providers: [
         { provide: WorkspacesService, useValue: service },
+        { provide: LabelsService, useValue: {} },
         { provide: ActivityService, useValue: { findForWorkspace: jest.fn() } },
       ],
     }).compile();

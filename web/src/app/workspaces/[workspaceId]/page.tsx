@@ -1,8 +1,8 @@
 'use client';
 
-import { FormEvent, use, useId, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { FormEvent, MouseEvent, use, useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { ActivityFeed } from '@/components/activity-feed';
@@ -17,7 +17,7 @@ import { CardDescription, CardTitle, cardClasses } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { useWorkspace } from '@/hooks/use-queries';
+import { useFavorites, useWorkspace } from '@/hooks/use-queries';
 import { api } from '@/lib/api';
 import { canManageWorkspace, isWorkspaceOwner } from '@/lib/workspace-utils';
 import { WorkspaceMember, WorkspaceRole } from '@/types/member';
@@ -32,6 +32,7 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
   const { workspaceId } = use(params);
   const { showToast } = useToast();
   const { data, isLoading, error } = useWorkspace(workspaceId);
+  const favoritesQuery = useFavorites();
   const inviteEmailId = useId();
   const inviteRoleId = useId();
 
@@ -110,6 +111,34 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
     }
   }
 
+  async function toggleProjectFavorite(
+    event: MouseEvent,
+    projectId: string,
+    isFavorite: boolean,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      if (isFavorite) {
+        await api(`/users/me/favorites/${projectId}`, { method: 'DELETE' });
+        showToast('Removed from favorites', 'success');
+      } else {
+        await api('/users/me/favorites', {
+          method: 'POST',
+          body: JSON.stringify({ projectId }),
+        });
+        showToast('Added to favorites', 'success');
+      }
+      await queryClient.invalidateQueries({ queryKey: ['favorites'] });
+    } catch (favoriteError) {
+      showToast(
+        favoriteError instanceof Error
+          ? favoriteError.message
+          : 'Unable to update favorite',
+      );
+    }
+  }
+
   if (isLoading) {
     return <LoadingScreen message="Loading workspace..." />;
   }
@@ -124,6 +153,10 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
       </main>
     );
   }
+
+  const favoriteProjectIds = new Set(
+    (favoritesQuery.data ?? []).map((favorite) => favorite.projectId),
+  );
 
   return (
     <AppShell
@@ -143,9 +176,12 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
 
         {canManage && (
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setShowEditModal(true)}>
+            <Link
+              href={`/workspaces/${workspaceId}/settings`}
+              className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-muted"
+            >
               Settings
-            </Button>
+            </Link>
             <Button onClick={() => setShowCreateModal(true)}>+ New Project</Button>
           </div>
         )}
@@ -158,27 +194,45 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
               Projects
             </h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {(data?.projects ?? []).map((project, index) => (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  className={cardClasses(true)}
-                  style={{
-                    borderLeftWidth: '4px',
-                    borderLeftColor: ['#6366f1', '#0d9488', '#f59e0b'][index % 3],
-                  }}
-                >
-                  <CardTitle className="text-base">{project.name}</CardTitle>
-                  {project.description && (
-                    <CardDescription className="line-clamp-2">
-                      {project.description}
+              {(data?.projects ?? []).map((project, index) => {
+                const isFavorite = favoriteProjectIds.has(project.id);
+
+                return (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className={cardClasses(true)}
+                    style={{
+                      borderLeftWidth: '4px',
+                      borderLeftColor: ['#6366f1', '#0d9488', '#f59e0b'][index % 3],
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-base">{project.name}</CardTitle>
+                      <button
+                        type="button"
+                        onClick={(event) =>
+                          toggleProjectFavorite(event, project.id, isFavorite)
+                        }
+                        className="text-lg leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label={
+                          isFavorite ? 'Remove from favorites' : 'Add to favorites'
+                        }
+                      >
+                        {isFavorite ? '★' : '☆'}
+                      </button>
+                    </div>
+                    {project.description && (
+                      <CardDescription className="line-clamp-2">
+                        {project.description}
+                      </CardDescription>
+                    )}
+                    <CardDescription className="mt-4">
+                      {project._count.tasks} tasks
                     </CardDescription>
-                  )}
-                  <CardDescription className="mt-4">
-                    {project._count.tasks} tasks
-                  </CardDescription>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </section>
 

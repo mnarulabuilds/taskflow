@@ -4,13 +4,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityService } from '../common/activity.service';
 import { NotificationsService } from '../common/notifications.service';
+import { EventsService } from '../events/events.service';
+import { LabelsService } from '../workspaces/labels.service';
 import { TasksService } from './tasks.service';
 
 describe('TasksService', () => {
   let service: TasksService;
   const prisma = {
     project: { findUnique: jest.fn() },
-    workspaceMember: { findUnique: jest.fn() },
+    workspaceMember: { findUnique: jest.fn(), findMany: jest.fn() },
     task: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -18,7 +20,9 @@ describe('TasksService', () => {
       delete: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
+      aggregate: jest.fn(),
     },
+    $transaction: jest.fn((callback) => callback(prisma)),
   };
 
   const allowProjectAccess = () => {
@@ -27,6 +31,7 @@ describe('TasksService', () => {
       workspaceId: 'workspace-1',
     });
     prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
+    prisma.workspaceMember.findMany.mockResolvedValue([]);
   };
 
   beforeEach(async () => {
@@ -37,6 +42,14 @@ describe('TasksService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ActivityService, useValue: { log: jest.fn() } },
         { provide: NotificationsService, useValue: { create: jest.fn() } },
+        {
+          provide: LabelsService,
+          useValue: { assertLabelsInWorkspace: jest.fn() },
+        },
+        {
+          provide: EventsService,
+          useValue: { emitToUsers: jest.fn() },
+        },
       ],
     }).compile();
     service = module.get<TasksService>(TasksService);
@@ -44,6 +57,7 @@ describe('TasksService', () => {
 
   it('creates a task, converting its due date and including task users', async () => {
     allowProjectAccess();
+    prisma.task.aggregate.mockResolvedValue({ _max: { position: 0 } });
     prisma.task.create.mockResolvedValue({ id: 'task-1' });
     const dto = {
       title: 'Write release notes',
@@ -54,16 +68,16 @@ describe('TasksService', () => {
     });
     expect(prisma.task.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: {
+        data: expect.objectContaining({
           title: dto.title,
           description: undefined,
-          status: undefined,
           priority: undefined,
           projectId: 'project-1',
           createdById: 'user-1',
           assigneeId: undefined,
           dueDate: new Date(dto.dueDate),
-        },
+          position: 1,
+        }),
       }),
     );
   });

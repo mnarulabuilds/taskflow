@@ -30,6 +30,18 @@ export function PendingInvites({ invites, onAccepted }: PendingInvitesProps) {
     }
   }
 
+  async function declineInvite(token: string) {
+    try {
+      await api(`/invites/${token}/decline`, { method: 'POST' });
+      showToast('Invite declined', 'success');
+      onAccepted();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Unable to decline invite',
+      );
+    }
+  }
+
   return (
     <section
       aria-labelledby="pending-invites-title"
@@ -50,9 +62,18 @@ export function PendingInvites({ invites, onAccepted }: PendingInvitesProps) {
                 Invited by {invite.invitedBy.name} as {invite.role}
               </p>
             </div>
-            <Button size="sm" onClick={() => acceptInvite(invite.token)}>
-              Accept
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => declineInvite(invite.token)}
+              >
+                Decline
+              </Button>
+              <Button size="sm" onClick={() => acceptInvite(invite.token)}>
+                Accept
+              </Button>
+            </div>
           </li>
         ))}
       </ul>

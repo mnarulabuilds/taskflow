@@ -3,12 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityService } from '../common/activity.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { ProjectsService } from './projects.service';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
   const prisma = {
-    workspaceMember: { findUnique: jest.fn() },
     project: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -16,6 +16,10 @@ describe('ProjectsService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+  };
+  const workspacesService = {
+    assertMembership: jest.fn(),
+    assertCanEditProject: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,13 +29,14 @@ describe('ProjectsService', () => {
         ProjectsService,
         { provide: PrismaService, useValue: prisma },
         { provide: ActivityService, useValue: { log: jest.fn() } },
+        { provide: WorkspacesService, useValue: workspacesService },
       ],
     }).compile();
     service = module.get<ProjectsService>(ProjectsService);
   });
 
   it('creates a project for a workspace member', async () => {
-    prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
+    workspacesService.assertMembership.mockResolvedValue({ id: 'membership-1' });
     prisma.project.create.mockResolvedValue({ id: 'project-1' });
     const dto = { name: 'Launch', description: 'Ship it' };
 
@@ -50,7 +55,7 @@ describe('ProjectsService', () => {
       id: 'project-1',
       workspaceId: 'workspace-1',
     });
-    prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
+    workspacesService.assertMembership.mockResolvedValue({ id: 'membership-1' });
 
     await expect(service.findOne('project-1', 'user-1')).resolves.toEqual(
       expect.objectContaining({
@@ -61,7 +66,7 @@ describe('ProjectsService', () => {
   });
 
   it('lists projects for a workspace member', async () => {
-    prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'membership-1' });
+    workspacesService.assertMembership.mockResolvedValue({ id: 'membership-1' });
     prisma.project.findMany.mockResolvedValue([]);
     await expect(service.findAll('workspace-1', 'user-1')).resolves.toEqual([]);
     expect(prisma.project.findMany).toHaveBeenCalledWith(
@@ -72,7 +77,9 @@ describe('ProjectsService', () => {
   it.each(['create', 'findAll'] as const)(
     'rejects %s for a user outside the workspace',
     async (operation) => {
-      prisma.workspaceMember.findUnique.mockResolvedValue(null);
+      workspacesService.assertMembership.mockRejectedValue(
+        new ForbiddenException(),
+      );
       const result =
         operation === 'create'
           ? service.create('workspace-1', 'user-1', { name: 'Launch' })

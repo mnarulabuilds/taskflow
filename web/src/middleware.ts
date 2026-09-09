@@ -10,7 +10,10 @@ export function middleware(request: NextRequest) {
   const isProtected =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/workspaces') ||
-    pathname.startsWith('/projects');
+    pathname.startsWith('/projects') ||
+    pathname.startsWith('/my-tasks') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/favorites');
 
   if (isProtected && !hasToken) {
     return NextResponse.redirect(new URL('/login', request.url));
